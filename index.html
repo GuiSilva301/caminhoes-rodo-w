@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17242F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Rodo W · Caminhões e motoristas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F7; --surface:#FFFFFF; --ink:#17242F; --ink2:#4D5B67; --ink3:#87939D;
+  --line:#E2E7EB; --line2:#CFD7DD; --acc:#1D5A7A; --acc2:#286F93; --accbg:#E5EFF5;
+  --jade:#0E7A66; --jadebg:#E3F3EF; --wine:#B23A48; --winebg:#F9E6E8; --amber:#9A6412; --amberbg:#FBF0DC;
+  --r-s:6px; --r-m:10px; --r-l:16px; --side:248px;
+  --money:"Fraunces", Georgia, serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.money{font-family:var(--money);font-variant-numeric:tabular-nums lining-nums;letter-spacing:-.01em}
+.pos{color:var(--jade)} .neg{color:var(--wine)} .muted{color:var(--ink3)}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.015em}
+
+/* ---------- Login ---------- */
+#login{min-height:100vh;display:none;grid-template-columns:1fr 1fr}
+#login .art{background:var(--ink);color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:space-between}
+#login .art .marca{font-family:var(--money);font-size:44px;line-height:1.05}
+#login .art .marca small{display:block;font-family:"Manrope";font-size:15px;opacity:.7;margin-top:10px;letter-spacing:0}
+#login .art p{max-width:34ch;opacity:.75;margin:0}
+#login form{align-self:center;justify-self:center;width:100%;max-width:360px;padding:32px 24px}
+#login h1{font-size:24px;margin-bottom:6px}
+.field{display:block;margin-top:14px}
+.field>span{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:6px}
+.inp{width:100%;border:1px solid var(--line2);background:var(--surface);border-radius:var(--r-m);padding:11px 12px;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--accbg)}
+.inp.num{text-align:right;font-variant-numeric:tabular-nums}
+textarea.inp{min-height:110px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.msg{font-size:13px;margin-top:12px;min-height:20px}
+.msg.err{color:var(--wine)} .msg.ok{color:var(--jade)}
+
+/* ---------- Botões ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:var(--r-m);padding:10px 16px;font-weight:700;cursor:pointer;background:var(--acc);color:#fff;white-space:nowrap;transition:background .15s}
+.btn:hover{background:var(--acc2)}
+.btn.sec{background:var(--surface);color:var(--ink);border-color:var(--line2)}
+.btn.sec:hover{background:var(--paper)}
+.btn.ghost{background:transparent;color:var(--acc);padding:8px 10px}
+.btn.ghost:hover{background:var(--accbg)}
+.btn.danger{background:var(--surface);color:var(--wine);border-color:var(--line2)}
+.btn.danger:hover{background:var(--winebg)}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:var(--r-s)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;color:var(--acc);font-weight:600;cursor:pointer;padding:0}
+.icon-btn{background:none;border:0;cursor:pointer;color:var(--ink3);padding:6px;border-radius:var(--r-s);display:inline-flex}
+.icon-btn:hover{background:var(--paper);color:var(--ink)}
+svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ---------- Estrutura ---------- */
+#app{display:none}
+#side{position:fixed;inset:0 auto 0 0;width:var(--side);background:var(--ink);color:#fff;display:flex;flex-direction:column;padding:24px 14px 18px;z-index:20;overflow-y:auto}
+#side .marca{font-family:var(--money);font-size:24px;line-height:1.1;padding:0 10px}
+#side .marca small{display:block;font-family:"Manrope";font-size:12px;opacity:.6;margin-top:4px}
+#side nav{margin-top:28px;display:flex;flex-direction:column;gap:2px}
+#side nav button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;color:rgba(255,255,255,.72);padding:10px 12px;border-radius:var(--r-m);cursor:pointer;font-weight:600}
+#side nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+#side nav button.on{background:#fff;color:var(--ink)}
+#side nav .grp{font-size:12px;opacity:.45;padding:18px 12px 6px}
+#side .conta{margin-top:auto;padding:12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px;opacity:.85;word-break:break-all}
+#side .conta button{background:none;border:0;color:#fff;opacity:.7;cursor:pointer;padding:0;margin-top:4px;text-decoration:underline}
+main{margin-left:var(--side);padding:32px 40px 80px;max-width:calc(1180px + var(--side))}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.head h1{font-size:26px}
+.head p{margin:4px 0 0;color:var(--ink2);max-width:62ch}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tools .inp{width:auto}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:20px}
+.panel+.panel{margin-top:16px}
+.panel h2{font-size:16px;margin-bottom:4px}
+.panel .sub{color:var(--ink3);font-size:13px;margin:0 0 14px}
+.panel-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+.faixa{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);margin-bottom:16px}
+.faixa>div{padding:18px 20px}
+.faixa>div+div{border-left:1px solid var(--line)}
+.faixa .l{font-size:13px;color:var(--ink2);font-weight:600}
+.faixa .v{font-size:28px;margin-top:4px}
+.faixa .s{font-size:12px;color:var(--ink3)}
+
+/* Tabelas */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:700;color:var(--ink3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tfoot td{border-top:2px solid var(--line2);font-weight:700}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.act{text-align:right;white-space:nowrap}
+.nc{display:none}
+.pessoa{display:flex;align-items:center;gap:10px;font-weight:600}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0;color:#fff}
+.placa{display:inline-block;font-weight:700;font-size:13px;letter-spacing:.04em;border:1.5px solid var(--ink);border-radius:5px;padding:0 6px;background:#fff;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.t-ok{background:var(--jadebg);color:var(--jade)} .t-bad{background:var(--winebg);color:var(--wine)} .t-warn{background:var(--amberbg);color:var(--amber)} .t-mut{background:var(--paper);color:var(--ink3)} .t-acc{background:var(--accbg);color:var(--acc)}
+.vazio{padding:28px 10px;text-align:center;color:var(--ink3)}
+.vazio .btn{margin-top:12px}
+.aviso{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-m);background:var(--amberbg);color:#5d3d09;margin-bottom:16px}
+.aviso.ok{background:var(--jadebg);color:#0b4f42}
+.aviso.info{background:var(--accbg);color:#123c52}
+.aviso b{display:block}
+
+/* ---------- Calendário ---------- */
+.mesnav{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:4px}
+.mesnav .lbl{padding:0 10px;font-weight:700;min-width:150px;text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .dow{font-size:12px;font-weight:700;color:var(--ink3);text-align:center;padding:4px 0}
+.cal .d{min-height:92px;border-radius:var(--r-s);background:var(--paper);padding:6px;font-size:13px;position:relative;cursor:pointer;border:1px solid transparent;text-align:left;display:flex;flex-direction:column}
+.cal .d:hover{border-color:var(--line2)}
+.cal .d.fora{opacity:.35;cursor:default}
+.cal .d.hoje{outline:2px solid var(--acc)}
+.cal .d .n{font-weight:700;display:flex;justify-content:space-between}
+.cal .d .n .q{font-size:11px;color:var(--acc)}
+.cal .d .chips{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.cal .d .chip{font-size:11px;font-weight:700;color:#fff;border-radius:4px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal .d .chip.x{outline:2px solid var(--amber);outline-offset:-2px}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:12px}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+.legenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* ---------- Holerite ---------- */
+.holerite{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);margin-bottom:12px;overflow:hidden}
+.holerite .topo{display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer}
+.holerite .topo .nome{flex:1;min-width:0}
+.holerite .topo .nome b{display:block}
+.holerite .topo .liq{text-align:right}
+.holerite .topo .liq .money{font-size:24px}
+.holerite .corpo{display:none;border-top:1px solid var(--line);padding:18px;grid-template-columns:1.2fr 1fr;gap:28px}
+.holerite.aberto .corpo{display:grid}
+.ln{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.ln:last-child{border-bottom:0}
+.ln.tot{border-top:2px solid var(--ink);border-bottom:0;margin-top:6px;padding-top:10px;font-weight:700}
+.ln.tot .money{font-size:20px}
+.bloco-t{font-size:13px;font-weight:700;color:var(--ink2);margin:14px 0 4px}
+.bloco-t:first-child{margin-top:0}
+.ajustes{background:var(--paper);border-radius:var(--r-m);padding:14px}
+
+/* ---------- Importação ---------- */
+.prev td{padding:4px 4px}
+.prev .inp{padding:6px 7px;font-size:13px;border-radius:6px;min-width:0}
+.prev tr.dup td{background:var(--amberbg)}
+.prev tr.off td{opacity:.45}
+.fotoprev{max-width:100%;max-height:260px;border-radius:var(--r-m);border:1px solid var(--line);display:block;margin-top:8px}
+.fotogrande{width:100%;border-radius:var(--r-m)}
+
+/* ---------- Modal ---------- */
+#modal{position:fixed;inset:0;background:rgba(23,36,47,.45);display:none;align-items:flex-start;justify-content:center;z-index:60;padding:48px 16px;overflow:auto}
+#modal.on{display:flex}
+#modal .box{background:var(--surface);border-radius:var(--r-l);width:100%;max-width:520px;padding:24px;box-shadow:0 20px 50px rgba(23,36,47,.25)}
+#modal h2{font-size:19px}
+#modal .desc{color:var(--ink2);margin:6px 0 4px}
+#modal .acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;flex-wrap:wrap}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}
+.fg .full,.fg3 .full{grid-column:1/-1}
+.ajuda{font-size:12px;color:var(--ink3);margin-top:4px}
+.toggle{display:flex;gap:10px;align-items:center;margin-top:16px;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--acc)}
+.chk{width:18px;height:18px;accent-color:var(--amber);cursor:pointer}
+.seg{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-m);padding:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;padding:7px 12px;border-radius:7px;font-weight:600;color:var(--ink2);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(23,36,47,.12)}
+
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--r-m);font-weight:600;opacity:0;transition:.2s;z-index:80;pointer-events:none;max-width:90vw}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--wine)}
+#carregando{position:fixed;inset:0;background:var(--paper);display:none;align-items:center;justify-content:center;z-index:90;flex-direction:column;gap:12px;color:var(--ink2)}
+#carregando i{width:28px;height:28px;border:3px solid var(--line2);border-top-color:var(--acc);border-radius:50%;animation:gira .7s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+#sync{font-size:12px;color:rgba(255,255,255,.55);margin-top:6px}
+
+/* ---------- Celular ---------- */
+#tabbar{display:none}
+#mais{display:none}
+@media (max-width:900px){
+  #side{display:none}
+  main{margin-left:0;padding:20px 16px 110px}
+  .head h1{font-size:22px}
+  .faixa{grid-template-columns:1fr 1fr}
+  .faixa>div:nth-child(3){border-left:0}
+  .faixa>div:nth-child(n+3){border-top:1px solid var(--line)}
+  .faixa .v{font-size:22px}
+  .grid2{grid-template-columns:1fr}
+  #tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:30}
+  #tabbar button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--ink3);padding:6px 0;cursor:pointer}
+  #tabbar button.on{color:var(--acc)}
+  #tabbar button.lancar{color:#fff}
+  #tabbar button.lancar span.bolha{background:var(--acc);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;margin-top:-18px;box-shadow:0 4px 12px rgba(29,90,122,.35)}
+  #tabbar button.lancar span.t{color:var(--acc)}
+  #mais.on{display:block;position:fixed;inset:0;background:rgba(23,36,47,.4);z-index:40}
+  #mais .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:var(--r-l) var(--r-l) 0 0;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
+  #mais .sheet button{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;padding:14px 12px;font-weight:600;text-align:left;border-radius:var(--r-m);cursor:pointer}
+  #mais .sheet button:hover{background:var(--paper)}
+  .mesnav .lbl{min-width:0;font-size:14px}
+  .holerite .corpo{grid-template-columns:1fr}
+  .holerite .topo .liq .money{font-size:20px}
+  .cal{gap:2px}
+  .cal .d{min-height:54px;padding:4px}
+  .cal .d .chips{flex-direction:row;flex-wrap:wrap;gap:2px}
+  .cal .d .chip{font-size:0;width:8px;height:8px;padding:0;border-radius:50%}
+  #login{grid-template-columns:1fr}
+  #login .art{padding:32px 24px;min-height:auto}
+  #login .art .marca{font-size:32px}
+  #login .art p{display:none}
+  .fg,.fg3{grid-template-columns:1fr 1fr}
+  td.hide-m,th.hide-m,.hide-m{display:none}
+  td.act .icon-btn{padding:4px}
+  .nf{display:none} .nc{display:inline} td.nc{display:table-cell}
+  #modal{padding:16px 8px}
+  #modal .box{padding:18px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{#side,#tabbar,.tools,.btn{display:none!important}main{margin:0;padding:0}}
+</style>
+</head>
+<body>
+
+<div id="carregando"><i></i><span>Carregando dados…</span></div>
+
+<!-- ======================= LOGIN ======================= -->
+<section id="login">
+  <div class="art">
+    <div class="marca">Rodo W<small>Caminhões e motoristas</small></div>
+    <p>Viagens, salários, vales e manutenção dos caminhões em um só lugar. Os dados ficam salvos na nuvem e aparecem no celular e no computador.</p>
+  </div>
+  <form onsubmit="event.preventDefault();entrar()">
+    <h1>Entrar</h1>
+    <div class="muted">Use o e-mail e a senha da sua conta.</div>
+    <label class="field"><span>E-mail</span><input class="inp" id="lgEmail" type="email" autocomplete="username" required></label>
+    <label class="field"><span>Senha</span><input class="inp" id="lgSenha" type="password" autocomplete="current-password" required></label>
+    <button class="btn block" style="margin-top:20px" id="lgBtn">Entrar</button>
+    <div class="msg" id="lgMsg"></div>
+    <button type="button" class="link" onclick="esqueciSenha()">Esqueci a senha</button>
+  </form>
+</section>
+
+<!-- ======================= APP ======================= -->
+<div id="app">
+  <aside id="side">
+    <div class="marca">Rodo W<small>Caminhões e motoristas</small></div>
+    <nav id="nav"></nav>
+    <div class="conta"><div id="contaEmail"></div><div id="sync">Tudo salvo</div><button onclick="sair()">Sair</button></div>
+  </aside>
+  <main id="main"></main>
+  <nav id="tabbar"></nav>
+  <div id="mais" onclick="if(event.target.id==='mais')fecharMais()"><div class="sheet" id="maisSheet"></div></div>
+</div>
+
+<div id="modal" onclick="if(event.target.id==='modal')fecharModal()"><div class="box" id="mbox" role="dialog" aria-modal="true"></div></div>
+<div id="toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* =====================================================================
+   Rodo W — Caminhões e motoristas
+   Dados no Firestore:
+     dados/cadastros   → motoristas, caminhões e lançamentos (vale, falta, folga, receita, desconto)
+     viagens/{id}      → uma viagem por documento
+     manutencoes/{id}  → um gasto por documento
+     fotos/{id}        → foto da folha do motorista ou da nota (comprimida)
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDqYDXmjo0OyxxYMPVX4gbGF3heTjWanHs",
+  authDomain: "caminhoes-rodo-w.firebaseapp.com",
+  projectId: "caminhoes-rodo-w",
+  storageBucket: "caminhoes-rodo-w.firebasestorage.app",
+  messagingSenderId: "336413200751",
+  appId: "1:336413200751:web:91df6be9f571953ab6989a"
+};
+const BACKUP_LOCAL = 'rodow_caminhoes_v1';
+const MOTORISTAS_INICIAIS = ['Renato','Elpídio','Serginho','Mário','Vitinho','Warley','Ualisson'];
+const CAMINHOES_INICIAIS = [
+  ['HGF-0783','racao'],['HJP-2G57','racao'],['MTS-5J31','racao'],
+  ['HEF-6073','leite'],['HBG-5722','leite'],['KON-8B29','leite'],['OQE-1H18','leite'],['HNC-3B15','leite']
+];
+const TIPOS_LANC = {
+  vale:{nome:'Vale', tag:'t-warn', desconto:true},
+  falta:{nome:'Falta', tag:'t-bad', desconto:true},
+  folga:{nome:'Folga', tag:'t-mut', desconto:false, semValor:true},
+  receita:{nome:'Receita avulsa', tag:'t-ok', desconto:false},
+  desconto:{nome:'Desconto avulso', tag:'t-bad', desconto:true}
+};
+const TIPOS_GASTO = ['Pneu','Óleo','Mecânica','Elétrica','Outro'];
+
+let cad = { motoristas:[], caminhoes:[], lancs:[] };
+let viagens = [], gastos = [];
+let db=null, auth=null, cadRef=null, unsubs=[];
+let salvando=null, pendente=false;
+
+/* ============================ UTILIDADES ============================ */
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const iso = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const hoje = () => iso(new Date());
+const br = s => s ? s.split('-').reverse().join('/') : '—';
+const brCurto = s => s ? s.slice(8,10)+'/'+s.slice(5,7) : '—';
+const mesAtual = () => hoje().slice(0,7);
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const DIAS = ['dom','seg','ter','qua','qui','sex','sáb'];
+const mesNome = ym => { const [y,m]=ym.split('-'); return MESES[+m-1]+' de '+y; };
+const mesNomeCap = ym => { const s=mesNome(ym); return s[0].toUpperCase()+s.slice(1); };
+const somaMes = (ym,n) => { const [y,m]=ym.split('-').map(Number); const d=new Date(y,m-1+n,1); return d.getFullYear()+'-'+pad(d.getMonth()+1); };
+const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const brl = v => BRL.format(Number(v)||0);
+const inteiro = v => (Number(v)||0).toLocaleString('pt-BR');
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const soma = (a,f) => a.reduce((t,x)=>t+(Number(f(x))||0),0);
+const r2 = v => Math.round((Number(v)||0)*100)/100;
+function num(v){
+  if (typeof v==='number') return v;
+  v=String(v??'').trim().replace(/[R$\s]/g,'');
+  if (!v) return 0;
+  if (v.includes(',')) v=v.replace(/\./g,'').replace(',','.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(v)) v=v.replace(/\./g,'');
+  const n=parseFloat(v); return isNaN(n)?0:Math.round(n*100)/100;
+}
+const int = v => { const s=String(v??'').replace(/\D/g,''); return s?parseInt(s,10):0; };
+const fmtInp = v => (v===''||v==null||num(v)===0) ? '' : num(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const normPlaca = s => String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const fmtPlaca = s => { const p=normPlaca(s); return p.length===7 ? p.slice(0,3)+'-'+p.slice(3) : p; };
+const CORES = ['#1D5A7A','#0E7A66','#B5651D','#7A4FB0','#B23A48','#4E7A1F','#2F5DA8','#9A6412','#5B6B78','#A0522D'];
+function corDe(id){ const i=cad.motoristas.findIndex(c=>c.id===id); return CORES[(i<0?0:i)%CORES.length]; }
+const iniciais = n => String(n||'?').trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();
+const mot = id => cad.motoristas.find(m=>m.id===id) || {id, nome:'(motorista apagado)'};
+const cam = placa => cad.caminhoes.find(c=>normPlaca(c.placa)===normPlaca(placa));
+const av = m => `<span class="av" style="background:${corDe(m.id)}">${esc(iniciais(m.nome))}</span>`;
+const placaTag = p => `<span class="placa">${esc(fmtPlaca(p)||'—')}</span>`;
+const unidade = placa => (cam(placa)||{}).tipo==='leite' ? 'L' : 'kg';
+const tipoNome = t => t==='leite' ? 'Leite' : 'Ração';
+function toast(msg, erro){ const t=$('toast'); t.textContent=msg; t.className='on'+(erro?' err':''); clearTimeout(toast.h); toast.h=setTimeout(()=>t.className='',3000); }
+const I = {
+  inicio:'<svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
+  lancar:'<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  viagens:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  importar:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg>',
+  motoristas:'<svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14.5c2.2.3 3.8 1.9 4.5 4.5"/></svg>',
+  fechamento:'<svg class="i" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  manutencao:'<svg class="i" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>',
+  caminhoes:'<svg class="i" viewBox="0 0 24 24"><path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+  conta:'<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>',
+  mais:'<svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+  esq:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  dir:'<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+  editar:'<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
+  lixo:'<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+  pdf:'<svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  foto:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg>',
+  x:'<svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+/* ============================ CÁLCULOS ============================
+   Fechamento do mês de cada motorista:
+     a receber = salário fixo + viagens marcadas como extra (valor de cada uma) + receitas avulsas
+     descontos = vales + faltas (valor lançado em cada falta) + descontos avulsos
+     líquido   = a receber − descontos
+   Folga só é registrada, não desconta nada.
+   ================================================================== */
+const noMes = (d,ym) => String(d||'').startsWith(ym);
+function viagensDe(motId, ym){ return viagens.filter(v=>v.motoristaId===motId && noMes(v.data,ym)).sort(ordViagem); }
+function lancsDe(motId, ym, tipo){ return cad.lancs.filter(l=>l.motoristaId===motId && noMes(l.data,ym) && (!tipo||l.tipo===tipo)).sort((a,b)=>a.data.localeCompare(b.data)); }
+function ordViagem(a,b){ return (a.data||'').localeCompare(b.data||'') || (Number(a.kmSaida)||0)-(Number(b.kmSaida)||0) || (a.criado||0)-(b.criado||0); }
+function calcMes(motId, ym){
+  const m=mot(motId);
+  const vs=viagensDe(motId,ym), extras=vs.filter(v=>v.extra);
+  const L=t=>lancsDe(motId,ym,t);
+  const r={ m, vs, extras, viagens:vs.length, km:soma(vs,v=>v.km),
+    fixo:r2(m.fixo), valorExtras:r2(soma(extras,v=>v.valorExtra)),
+    receitas:L('receita'), vales:L('vale'), faltas:L('falta'), folgas:L('folga'), descontos:L('desconto') };
+  r.totReceitas=r2(soma(r.receitas,l=>l.valor));
+  r.totVales=r2(soma(r.vales,l=>l.valor)); r.totFaltas=r2(soma(r.faltas,l=>l.valor)); r.totDescontos=r2(soma(r.descontos,l=>l.valor));
+  r.bruto=r2(r.fixo+r.valorExtras+r.totReceitas);
+  r.totDesc=r2(r.totVales+r.totFaltas+r.totDescontos);
+  r.liquido=r2(r.bruto-r.totDesc);
+  return r;
+}
+function ativosNoMes(ym){
+  return cad.motoristas.filter(m=>m.ativo!==false || viagens.some(v=>v.motoristaId===m.id&&noMes(v.data,ym)) || cad.lancs.some(l=>l.motoristaId===m.id&&noMes(l.data,ym)));
+}
+
+/* ============================ DADOS ============================ */
+function normalizar(s){
+  s=s||{};
+  s.motoristas=s.motoristas||[]; s.caminhoes=s.caminhoes||[]; s.lancs=s.lancs||[];
+  return s;
+}
+function cadastroInicial(){
+  return {
+    motoristas: MOTORISTAS_INICIAIS.map(n=>({id:uid(), nome:n, fixo:0, ativo:true})),
+    caminhoes: CAMINHOES_INICIAIS.map(([p,t])=>({id:uid(), placa:p, tipo:t, modelo:'', ativo:true})),
+    lancs: []
+  };
+}
+function statusSync(t){ const el=$('sync'); if(el) el.textContent=t; }
+function guardarLocal(){ try{ localStorage.setItem(BACKUP_LOCAL, JSON.stringify({cad, viagens, gastos})); }catch(e){} }
+function salvar(){
+  guardarLocal(); pendente=true; statusSync('Salvando…');
+  clearTimeout(salvando);
+  salvando=setTimeout(async()=>{
+    try{ await cadRef.set(JSON.parse(JSON.stringify(cad))); pendente=false; statusSync('Tudo salvo'); }
+    catch(e){ console.error(e); statusSync('Não salvou'); erroSalvar(e); }
+  },400);
+}
+function erroSalvar(e){ toast(e&&e.code==='permission-denied' ? 'Sem permissão para salvar. Saia e entre de novo.' : 'Não foi possível salvar. Verifique a internet.', true); }
+async function gravar(colecao, obj){
+  const o=JSON.parse(JSON.stringify(obj)); const id=o.id||uid(); delete o.id;
+  try{ await db.collection(colecao).doc(id).set(o); return id; }
+  catch(e){ console.error(e); erroSalvar(e); throw e; }
+}
+async function apagarDoc(colecao, id){
+  try{ await db.collection(colecao).doc(id).delete(); }
+  catch(e){ console.error(e); erroSalvar(e); throw e; }
+}
+function escutar(){
+  $('carregando').style.display='flex';
+  const chegou={};
+  const pronto=fonte=>{
+    if(Object.keys(chegou).length===3){ redesenhar(); return; }
+    chegou[fonte]=1;
+    if(Object.keys(chegou).length===3){ $('carregando').style.display='none'; render(); }
+  };
+  const erro=err=>{ console.error(err); $('carregando').style.display='none';
+    toast(err.code==='permission-denied'?'Esta conta não tem acesso aos dados.':'Erro ao carregar os dados.', true); };
+  unsubs.push(cadRef.onSnapshot(snap=>{
+    if(pendente || snap.metadata.hasPendingWrites){ if(!chegou.cad) pronto('cad'); return; }
+    if(!snap.exists){ cad=cadastroInicial(); salvar(); }
+    else cad=normalizar(snap.data());
+    guardarLocal(); pronto('cad');
+  }, erro));
+  const col=(nome,set)=>db.collection(nome).onSnapshot(snap=>{
+    set(snap.docs.map(d=>({id:d.id,...d.data()}))); guardarLocal(); pronto(nome);
+  }, erro);
+  unsubs.push(col('viagens', a=>viagens=a));
+  unsubs.push(col('manutencoes', a=>gastos=a));
+}
+function redesenhar(){ if(!$('modal').classList.contains('on') && !digitando()) render(); }
+function digitando(){ const a=document.activeElement; return a && $('main').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); }
+
+/* ============================ NAVEGAÇÃO ============================ */
+const PAGS = [
+  {id:'inicio', nome:'Início', i:'inicio'},
+  {id:'viagens', nome:'Viagens', i:'viagens'},
+  {id:'motoristas', nome:'Vales, faltas e folgas', i:'motoristas'},
+  {id:'fechamento', nome:'Fechamento do mês', i:'fechamento'},
+  {id:'manutencao', nome:'Manutenção', i:'manutencao'},
+  {g:'Cadastros'},
+  {id:'cadastros', nome:'Motoristas e caminhões', i:'caminhoes'},
+  {id:'conta', nome:'Minha conta', i:'conta'}
+];
+const MAIS_IDS=['motoristas','manutencao','cadastros','conta'];
+let pag='inicio';
+const V = { mes: mesAtual(), fMot:'', fPlaca:'', lMot:'', gPlaca:'', abertos:{} };
+function ir(p, opts){ pag=p; if(opts) Object.assign(V,opts); fecharMais(); history.replaceState(null,'','#'+p); window.scrollTo(0,0); render(); }
+function render(){
+  $('nav').innerHTML = PAGS.map(p=>p.g?`<div class="grp">${p.g}</div>`:`<button class="${pag===p.id?'on':''}" onclick="ir('${p.id}')">${I[p.i]}${p.nome}</button>`).join('');
+  const tab=[['inicio','Início','inicio'],['viagens','Viagens','viagens'],['lancar','Lançar','lancar'],['fechamento','Mês','fechamento'],['mais','Mais','mais']];
+  $('tabbar').innerHTML = tab.map(([id,n,ic])=>{
+    if(id==='lancar') return `<button class="lancar" onclick="abrirLancar()"><span class="bolha">${I.lancar}</span><span class="t">${n}</span></button>`;
+    if(id==='mais') return `<button class="${MAIS_IDS.includes(pag)?'on':''}" onclick="abrirMais()">${I.mais}${n}</button>`;
+    return `<button class="${pag===id?'on':''}" onclick="ir('${id}')">${I[ic]}${n}</button>`;
+  }).join('');
+  $('main').innerHTML = (R[pag]||R.inicio)();
+}
+function sheet(itens){ $('maisSheet').innerHTML=itens.map(([fn,ic,n])=>`<button onclick="fecharMais();${fn}">${I[ic]}${n}</button>`).join(''); $('mais').classList.add('on'); }
+function abrirMais(){ sheet([...MAIS_IDS.map(id=>{const p=PAGS.find(x=>x.id===id);return [`ir('${id}')`,p.i,p.nome];}),['sair()','x','Sair']]); }
+function abrirLancar(){ sheet([["formViagem()",'viagens','Nova viagem'],["formImportar()",'importar','Importar viagens da folha'],["formLanc()",'motoristas','Vale, falta, folga ou avulso'],["formGasto()",'manutencao','Gasto de manutenção']]); }
+function fecharMais(){ $('mais').classList.remove('on'); }
+
+/* ============================ MODAL ============================ */
+let MODAL=null;
+function abrirModal({titulo, desc='', corpo='', ok='Salvar', cancelar='Cancelar', perigo=false, aoConfirmar, larg, extra=''}){
+  MODAL={aoConfirmar};
+  $('mbox').style.maxWidth=larg||'520px';
+  $('mbox').innerHTML=`<h2>${titulo}</h2>${desc?`<p class="desc">${desc}</p>`:''}<form id="mform" onsubmit="event.preventDefault();confirmarModal()">${corpo}<div class="acoes">${extra}${cancelar?`<button type="button" class="btn sec" onclick="fecharModal()">${cancelar}</button>`:''}${ok?`<button class="btn ${perigo?'danger':''}" id="mok">${ok}</button>`:''}</div></form>`;
+  $('modal').classList.add('on');
+  setTimeout(()=>{ const f=$('mform')&&$('mform').querySelector('input:not([type=checkbox]):not([type=file]),select,textarea'); if(f && window.innerWidth>900) f.focus(); },30);
+}
+async function confirmarModal(){ if(!MODAL) return; const b=$('mok'); if(b) b.disabled=true; let r; try{ r=await MODAL.aoConfirmar?.($('mform')); }catch(e){ r=false; } if(b) b.disabled=false; if(r===false) return; fecharModal(); }
+function fecharModal(){ $('modal').classList.remove('on'); MODAL=null; render(); }
+function confirmar(titulo, desc, ok, fn){ abrirModal({titulo, desc, ok, perigo:true, aoConfirmar:fn}); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('on')) fecharModal(); fecharMais(); } });
+
+const R = {};
+const optsMot = (sel, todos) => (todos?`<option value="">${todos}</option>`:'')+cad.motoristas.filter(m=>m.ativo!==false||m.id===sel).map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.nome)}</option>`).join('');
+const optsPlaca = (sel, todos) => (todos?`<option value="">${todos}</option>`:'')+['racao','leite'].map(t=>{
+  const cs=cad.caminhoes.filter(c=>c.tipo===t&&(c.ativo!==false||normPlaca(c.placa)===normPlaca(sel))); if(!cs.length) return '';
+  return `<optgroup label="${tipoNome(t)}">${cs.map(c=>`<option value="${esc(c.placa)}" ${normPlaca(c.placa)===normPlaca(sel)?'selected':''}>${esc(c.placa)}${c.modelo?' · '+esc(c.modelo):''}</option>`).join('')}</optgroup>`;
+}).join('');
+function seletorMes(){ return `<div class="mesnav"><button class="icon-btn" onclick="V.mes=somaMes(V.mes,-1);render()" aria-label="Mês anterior">${I.esq}</button><span class="lbl">${mesNomeCap(V.mes)}</span><button class="icon-btn" onclick="V.mes=somaMes(V.mes,1);render()" aria-label="Próximo mês">${I.dir}</button></div>`; }
+
+/* ============================ INÍCIO ============================ */
+R.inicio = () => {
+  const ym=V.mes, vs=viagens.filter(v=>noMes(v.data,ym)), gs=gastos.filter(g=>noMes(g.data,ym));
+  const ext=vs.filter(v=>v.extra);
+  const semFixo=cad.motoristas.filter(m=>m.ativo!==false && !num(m.fixo));
+  const porMot=ativosNoMes(ym).map(m=>{ const a=vs.filter(v=>v.motoristaId===m.id); return {m, n:a.length, km:soma(a,v=>v.km), ext:a.filter(v=>v.extra).length}; });
+  const porCam=cad.caminhoes.map(c=>{ const a=vs.filter(v=>normPlaca(v.placa)===normPlaca(c.placa)), g=gs.filter(x=>normPlaca(x.placa)===normPlaca(c.placa)); return {c, n:a.length, km:soma(a,v=>v.km), carga:soma(a,v=>v.carga), gasto:soma(g,x=>x.valor)}; }).filter(x=>x.c.ativo!==false||x.n||x.gasto);
+  return `
+  <div class="head"><div><h1>Início</h1><p>Resumo do mês: viagens, quilômetros e gastos de manutenção.</p></div><div class="tools">${seletorMes()}</div></div>
+  ${semFixo.length?`<div class="aviso"><div><b>Salário fixo ainda não cadastrado</b>${semFixo.map(m=>esc(m.nome)).join(', ')}. O fechamento só fica completo depois de preencher em <button class="link" onclick="ir('cadastros')">Motoristas e caminhões</button>.</div></div>`:''}
+  <div class="faixa">
+    <div><div class="l">Viagens no mês</div><div class="v money">${inteiro(vs.length)}</div><div class="s">${new Set(vs.map(v=>v.motoristaId)).size} motorista(s)</div></div>
+    <div><div class="l">Km rodados</div><div class="v money">${inteiro(soma(vs,v=>v.km))}</div><div class="s">soma das viagens lançadas</div></div>
+    <div><div class="l">Viagens extras</div><div class="v money">${inteiro(ext.length)}</div><div class="s">${brl(soma(ext,v=>v.valorExtra))} a pagar</div></div>
+    <div><div class="l">Manutenção</div><div class="v money">${brl(soma(gs,g=>g.valor))}</div><div class="s">${gs.length} lançamento(s)</div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><div class="panel-h"><div><h2>Por motorista</h2><p class="sub">Viagens lançadas em ${mesNome(ym)}.</p></div><button class="btn sm sec" onclick="formImportar()">${I.importar}Importar folha</button></div>
+      ${porMot.length?`<div class="tw"><table><thead><tr><th>Motorista</th><th class="n">Viagens</th><th class="n">Km</th><th class="n">Extras</th></tr></thead><tbody>
+      ${porMot.map(x=>`<tr style="cursor:pointer" onclick="ir('viagens',{fMot:'${x.m.id}',fPlaca:''})"><td><span class="pessoa">${av(x.m)}${esc(x.m.nome)}</span></td><td class="n">${x.n}</td><td class="n">${inteiro(x.km)}</td><td class="n">${x.ext?`<span class="tag t-warn">${x.ext}</span>`:'<span class="muted">—</span>'}</td></tr>`).join('')}
+      </tbody></table></div>`:`<div class="vazio">Nenhum motorista cadastrado.</div>`}
+    </div>
+    <div class="panel"><div class="panel-h"><div><h2>Por caminhão</h2><p class="sub">Viagens e manutenção de cada placa no mês.</p></div></div>
+      <div class="tw"><table><thead><tr><th>Placa</th><th class="n">Viagens</th><th class="n">Km</th><th class="n">Manutenção</th></tr></thead><tbody>
+      ${porCam.map(x=>`<tr style="cursor:pointer" onclick="ir('viagens',{fPlaca:'${esc(x.c.placa)}',fMot:''})"><td>${placaTag(x.c.placa)} <span class="muted" style="font-size:12px">${tipoNome(x.c.tipo)}</span></td><td class="n">${x.n}</td><td class="n">${inteiro(x.km)}</td><td class="n money">${x.gasto?brl(x.gasto):'<span class="muted">—</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+  </div>`;
+};
+
+/* ============================ VIAGENS (calendário) ============================ */
+function viagensFiltradas(ym){
+  return viagens.filter(v=>noMes(v.data,ym) && (!V.fMot||v.motoristaId===V.fMot) && (!V.fPlaca||normPlaca(v.placa)===normPlaca(V.fPlaca))).sort(ordViagem);
+}
+R.viagens = () => {
+  const ym=V.mes, vs=viagensFiltradas(ym);
+  const [y,m]=ym.split('-').map(Number), prim=new Date(y,m-1,1), nDias=new Date(y,m,0).getDate(), ini=prim.getDay();
+  let cel=DIAS.map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<ini;i++) cel+=`<div class="d fora"></div>`;
+  for(let d=1; d<=nDias; d++){
+    const ds=ym+'-'+pad(d), dv=vs.filter(v=>v.data===ds);
+    const grupos={}; dv.forEach(v=>{ (grupos[v.motoristaId]=grupos[v.motoristaId]||[]).push(v); });
+    const chips=Object.entries(grupos).map(([id,a])=>`<span class="chip ${a.some(v=>v.extra)?'x':''}" style="background:${corDe(id)}" title="${esc(mot(id).nome)}: ${a.length} viagem(ns)">${esc(mot(id).nome.split(' ')[0])}${a.length>1?' ×'+a.length:''}</span>`).join('');
+    cel+=`<button type="button" class="d ${ds===hoje()?'hoje':''}" onclick="abrirDia('${ds}')"><span class="n">${d}${dv.length?`<span class="q">${dv.length}</span>`:''}</span><span class="chips">${chips}</span></button>`;
+  }
+  const motsNoMes=[...new Set(vs.map(v=>v.motoristaId))];
+  const ext=vs.filter(v=>v.extra);
+  return `
+  <div class="head"><div><h1>Viagens</h1><p>Toque num dia para ver, corrigir ou acrescentar viagens. Marque as extras na lista abaixo do calendário.</p></div>
+    <div class="tools">${seletorMes()}<button class="btn sec" onclick="formImportar()">${I.importar}Importar folha</button><button class="btn" onclick="formViagem()">${I.lancar}Nova viagem</button></div></div>
+  <div class="tools" style="margin-bottom:12px">
+    <select class="inp" onchange="V.fMot=this.value;render()" aria-label="Filtrar por motorista">${optsMot(V.fMot,'Todos os motoristas')}</select>
+    <select class="inp" onchange="V.fPlaca=this.value;render()" aria-label="Filtrar por caminhão">${optsPlaca(V.fPlaca,'Todos os caminhões')}</select>
+    ${V.fMot||V.fPlaca?`<button class="btn ghost sm" onclick="V.fMot='';V.fPlaca='';render()">Limpar filtros</button>`:''}
+  </div>
+  <div class="faixa">
+    <div><div class="l">Viagens</div><div class="v money">${vs.length}</div></div>
+    <div><div class="l">Km rodados</div><div class="v money">${inteiro(soma(vs,v=>v.km))}</div></div>
+    <div><div class="l">Carga</div><div class="v money" style="font-size:22px">${cargaResumo(vs)}</div></div>
+    <div><div class="l">Extras</div><div class="v money">${ext.length}</div><div class="s">${brl(soma(ext,v=>v.valorExtra))}</div></div>
+  </div>
+  <div class="panel"><div class="cal">${cel}</div>
+    ${motsNoMes.length?`<div class="legenda">${motsNoMes.map(id=>`<span><i style="background:${corDe(id)}"></i>${esc(mot(id).nome)}</span>`).join('')}<span><i style="background:#fff;outline:2px solid var(--amber)"></i>dia com viagem extra</span></div>`:''}
+  </div>
+  <div class="panel"><div class="panel-h"><div><h2>Lista do mês</h2><p class="sub">Marque a caixa “Extra” nas viagens que vão ser pagas à parte e informe o valor.</p></div></div>
+    ${vs.length?tabelaViagens(vs):`<div class="vazio">Nenhuma viagem em ${mesNome(ym)}${V.fMot||V.fPlaca?' com esses filtros':''}.<br><button class="btn" onclick="formImportar()">Importar folha do motorista</button></div>`}
+  </div>`;
+};
+function cargaResumo(vs){
+  const kg=soma(vs.filter(v=>unidade(v.placa)==='kg'),v=>v.carga), l=soma(vs.filter(v=>unidade(v.placa)==='L'),v=>v.carga);
+  const p=[]; if(kg) p.push(inteiro(kg)+' kg'); if(l) p.push(inteiro(l)+' L'); return p.join(' · ')||'—';
+}
+function tabelaViagens(vs, compacta){
+  return `<div class="tw"><table><thead><tr><th>Data</th>${compacta?'':'<th class="hide-m">Motorista</th>'}<th>Placa</th><th class="hide-m">Rota</th><th class="n">Km</th><th class="n hide-m">Bocas</th><th class="n hide-m">Carga</th><th class="n">Extra</th><th></th></tr></thead><tbody>
+  ${vs.map(v=>{ const m=mot(v.motoristaId); return `<tr>
+    <td>${brCurto(v.data)}<div class="nc muted" style="font-size:12px">${esc(m.nome.split(' ')[0])}</div></td>${compacta?'':`<td class="hide-m"><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>`}
+    <td>${placaTag(v.placa)}</td><td class="hide-m">${esc(v.rota||'')}${v.obs?`<div class="muted" style="font-size:12px">${esc(v.obs)}</div>`:''}</td>
+    <td class="n">${inteiro(v.km)}</td><td class="n hide-m">${v.bocas||''}</td><td class="n hide-m">${v.carga?inteiro(v.carga)+' '+unidade(v.placa):''}</td>
+    <td class="n"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" class="chk" ${v.extra?'checked':''} onchange="marcarExtra('${v.id}',this.checked)" aria-label="Viagem extra">${v.extra?`<span class="money">${brl(v.valorExtra)}</span>`:''}</label></td>
+    <td class="act">${v.fotoId?`<button class="icon-btn hide-m" title="Ver foto da folha" onclick="verFoto('${v.fotoId}')">${I.foto}</button>`:''}<button class="icon-btn" title="Editar" onclick="formViagem('${v.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarViagem('${v.id}')">${I.lixo}</button></td>
+  </tr>`; }).join('')}
+  </tbody></table></div>`;
+}
+let ultimoValorExtra = '';
+function marcarExtra(id, on){
+  const v=viagens.find(x=>x.id===id); if(!v) return;
+  if(!on){ v.extra=false; v.valorExtra=0; gravar('viagens',v).then(()=>toast('Viagem desmarcada como extra')); render(); return; }
+  abrirModal({titulo:'Viagem extra', desc:`${br(v.data)} · ${esc(mot(v.motoristaId).nome)} · ${esc(fmtPlaca(v.placa))}${v.rota?' · '+esc(v.rota):''}`,
+    corpo:`<label class="field"><span>Valor a pagar por esta viagem (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${esc(ultimoValorExtra)}" required></label><div class="ajuda">O valor entra no fechamento do mês do motorista.</div>`,
+    aoConfirmar:async f=>{ const val=num(f.valor.value); if(val<=0){ toast('Informe o valor da viagem extra.',true); return false; }
+      ultimoValorExtra=fmtInp(val); v.extra=true; v.valorExtra=val; await gravar('viagens',v); toast('Viagem marcada como extra'); }});
+}
+function abrirDia(ds){
+  const vs=viagensFiltradas(ds.slice(0,7)).filter(v=>v.data===ds);
+  abrirModal({titulo:`${DIAS[new Date(ds+'T12:00').getDay()]}, ${br(ds)}`, larg:'760px', ok:'', cancelar:'Fechar',
+    corpo: vs.length?tabelaViagens(vs):`<div class="vazio">Nenhuma viagem neste dia${V.fMot||V.fPlaca?' com os filtros escolhidos':''}.</div>`,
+    extra:`<button type="button" class="btn sec" style="margin-right:auto" onclick="formViagem(null,'${ds}')">${I.lancar}Viagem neste dia</button>`});
+}
+function formViagem(id, dataPadrao){
+  const v=id?viagens.find(x=>x.id===id):{data:dataPadrao||(noMes(hoje(),V.mes)?hoje():V.mes+'-01'), motoristaId:V.fMot||'', placa:V.fPlaca||''};
+  if(!v) return;
+  if(!cad.motoristas.length){ toast('Cadastre um motorista primeiro.',true); return; }
+  abrirModal({titulo:id?'Editar viagem':'Nova viagem', larg:'600px',
+    corpo:`<div class="fg">
+      <label class="field"><span>Data</span><input class="inp" type="date" name="data" value="${esc(v.data)}" required></label>
+      <label class="field"><span>Motorista</span><select class="inp" name="mot" required><option value="">Escolha…</option>${optsMot(v.motoristaId)}</select></label>
+      <label class="field"><span>Caminhão</span><select class="inp" name="placa" required><option value="">Escolha…</option>${optsPlaca(v.placa)}</select></label>
+      <label class="field"><span>Rota / destino</span><input class="inp" name="rota" value="${esc(v.rota||'')}" placeholder="Ex.: Calp"></label>
+    </div><div class="fg3">
+      <label class="field"><span>Km saída</span><input class="inp num" name="ks" inputmode="numeric" value="${v.kmSaida||''}" oninput="calcKm(this.form)"></label>
+      <label class="field"><span>Km chegada</span><input class="inp num" name="kc" inputmode="numeric" value="${v.kmChegada||''}" oninput="calcKm(this.form)"></label>
+      <label class="field"><span>Km rodados</span><input class="inp num" name="km" inputmode="numeric" value="${v.km||''}"></label>
+      <label class="field"><span>Bocas</span><input class="inp num" name="bocas" inputmode="numeric" value="${v.bocas||''}"></label>
+      <label class="field"><span>Carga (kg ou litros)</span><input class="inp num" name="carga" inputmode="numeric" value="${v.carga||''}"></label>
+      <label class="field"><span>Valor extra (R$)</span><input class="inp num" name="vext" inputmode="decimal" value="${fmtInp(v.valorExtra)}" placeholder="só se for extra"></label>
+    </div>
+    <label class="field"><span>Observação</span><input class="inp" name="obs" value="${esc(v.obs||'')}"></label>
+    <label class="toggle"><input type="checkbox" name="extra" ${v.extra?'checked':''}> Viagem extra (paga à parte no fechamento)</label>`,
+    aoConfirmar:async f=>{
+      const o={...v, data:f.data.value, motoristaId:f.mot.value, placa:fmtPlaca(f.placa.value), rota:f.rota.value.trim(),
+        kmSaida:int(f.ks.value), kmChegada:int(f.kc.value), km:int(f.km.value), bocas:int(f.bocas.value), carga:int(f.carga.value),
+        obs:f.obs.value.trim(), extra:f.extra.checked, valorExtra:f.extra.checked?num(f.vext.value):0};
+      if(!o.data||!o.motoristaId||!o.placa){ toast('Preencha data, motorista e caminhão.',true); return false; }
+      if(o.extra && o.valorExtra<=0){ toast('Informe o valor da viagem extra.',true); return false; }
+      if(!o.km && o.kmChegada>o.kmSaida) o.km=o.kmChegada-o.kmSaida;
+      if(!id) o.criado=Date.now();
+      await gravar('viagens',o); toast(id?'Viagem atualizada':'Viagem lançada');
+    }});
+}
+function calcKm(f){ const s=int(f.ks.value), c=int(f.kc.value); if(s&&c&&c>s) f.km.value=c-s; }
+function apagarViagem(id){
+  const v=viagens.find(x=>x.id===id); if(!v) return;
+  confirmar('Apagar esta viagem?', `${br(v.data)} · ${esc(mot(v.motoristaId).nome)} · ${esc(fmtPlaca(v.placa))}. Isso não pode ser desfeito.`, 'Apagar', async()=>{ await apagarDoc('viagens',id); toast('Viagem apagada'); });
+}
+async function verFoto(id){
+  abrirModal({titulo:'Foto', larg:'900px', ok:'', cancelar:'Fechar', corpo:'<div class="vazio">Carregando foto…</div>'});
+  try{
+    const s=await db.collection('fotos').doc(id).get();
+    if(!$('modal').classList.contains('on')) return;
+    $('mform').firstElementChild.outerHTML = s.exists ? `<div><img class="fotogrande" src="${s.data().img}" alt="Foto"><div class="ajuda">Enviada em ${br(iso(new Date(s.data().criado||Date.now())))}.</div></div>` : '<div class="vazio">Foto não encontrada.</div>';
+  }catch(e){ console.error(e); toast('Não foi possível abrir a foto.',true); }
+}
+
+/* ============================ IMPORTAR DA FOLHA ============================
+   A foto é lida no chat do Claude, que devolve as linhas neste formato
+   (separadas por ponto e vírgula ou tabulação, uma viagem por linha):
+     data;rota;km saída;km chegada;km;bocas;carga;placa;observação
+   ======================================================================= */
+let IMP = null;
+function formImportar(){
+  if(!cad.motoristas.length){ toast('Cadastre um motorista primeiro.',true); return; }
+  IMP={foto:null, linhas:[]};
+  abrirModal({titulo:'Importar viagens da folha', larg:'1100px', ok:'Gravar viagens',
+    desc:'Mande a foto da folha no chat do Claude, cole aqui o texto que ele devolver e confira as linhas antes de gravar.',
+    corpo:`<div class="fg">
+      <label class="field"><span>Motorista da folha</span><select class="inp" name="mot" required onchange="previaImport()"><option value="">Escolha…</option>${optsMot(V.fMot)}</select></label>
+      <label class="field"><span>Foto da folha (opcional, fica guardada junto)</span><input class="inp" type="file" name="foto" accept="image/*" onchange="lerFotoImport(this)"></label>
+      <label class="field full"><span>Texto da leitura</span><textarea class="inp" name="txt" placeholder="01/10/2026;Calp;485446;485615;169;4;10210;MTS-5J31;" oninput="previaImport()"></textarea>
+      <div class="ajuda">Uma viagem por linha: data; rota; km saída; km chegada; km; bocas; carga; placa; observação.</div></label>
+    </div>
+    <div id="impFoto"></div>
+    <div id="impPrev" style="margin-top:14px"></div>`,
+    aoConfirmar:gravarImport});
+}
+async function lerFotoImport(inp){
+  const f=inp.files&&inp.files[0]; if(!f){ IMP.foto=null; $('impFoto').innerHTML=''; return; }
+  $('impFoto').innerHTML='<div class="ajuda">Preparando a foto…</div>';
+  preparandoFoto=true;
+  try{ IMP.foto=await comprimir(f); $('impFoto').innerHTML=`<img class="fotoprev" src="${IMP.foto}" alt="Foto da folha">`; }
+  catch(e){ console.error(e); IMP.foto=null; $('impFoto').innerHTML=''; toast('Não foi possível ler essa foto.',true); }
+  preparandoFoto=false;
+}
+function comprimir(file){
+  return new Promise((ok,erro)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let w=img.naturalWidth, h=img.naturalHeight; const max=1600; if(Math.max(w,h)>max){ const k=max/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+      let q=0.72, out=c.toDataURL('image/jpeg',q); while(out.length>850000 && q>0.3){ q-=0.1; out=c.toDataURL('image/jpeg',q); }
+      ok(out);
+    };
+    img.onerror=erro; img.src=url;
+  });
+}
+function lerData(s, anoPadrao){
+  s=String(s||'').trim(); let m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?$/))){ let a=m[3]?(m[3].length===2?'20'+m[3]:m[3]):anoPadrao; return a+'-'+pad(m[2])+'-'+pad(m[1]); }
+  return '';
+}
+function acharPlaca(txt){
+  const p=normPlaca(txt); if(!p) return '';
+  const exata=cad.caminhoes.find(c=>normPlaca(c.placa)===p); if(exata) return exata.placa;
+  const fim=cad.caminhoes.filter(c=>normPlaca(c.placa).endsWith(p)); if(fim.length===1) return fim[0].placa;
+  return '';
+}
+function parseLinhas(txt){
+  const ano=V.mes.slice(0,4);
+  return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/\t|;/).map(x=>x.trim())).filter(c=>lerData(c[0],ano)).map(c=>{
+    const ks=int(c[2]), kc=int(c[3]); let km=int(c[4]); if(!km && kc>ks) km=kc-ks;
+    return { importar:true, data:lerData(c[0],ano), rota:c[1]||'', kmSaida:ks, kmChegada:kc, km, bocas:int(c[5]), carga:int(c[6]), placaLida:c[7]||'', placa:acharPlaca(c[7]), obs:c[8]||'' };
+  });
+}
+function duplicada(l, motId){ return viagens.some(v=>v.motoristaId===motId && v.data===l.data && ((l.kmSaida && v.kmSaida===l.kmSaida) || (!l.kmSaida && v.km===l.km && normPlaca(v.placa)===normPlaca(l.placa)))); }
+function previaImport(){
+  const f=$('mform'); if(!f||!IMP) return;
+  IMP.linhas=parseLinhas(f.txt.value); const motId=f.mot.value;
+  IMP.linhas.forEach(l=>{ l.dup=motId&&duplicada(l,motId); if(l.dup) l.importar=false; });
+  desenharPrevia();
+}
+function desenharPrevia(){
+  const ls=IMP.linhas;
+  if(!ls.length){ $('impPrev').innerHTML=$('mform').txt.value.trim()?'<div class="aviso">Nenhuma linha reconhecida. Cada linha precisa começar pela data (ex.: 01/10/2026).</div>':''; return; }
+  const n=ls.filter(l=>l.importar).length, dup=ls.filter(l=>l.dup).length, semPlaca=ls.filter(l=>l.importar&&!l.placa).length, kmErr=ls.filter(l=>l.kmSaida&&l.kmChegada&&l.kmChegada-l.kmSaida!==l.km).length;
+  $('impPrev').innerHTML=`
+    ${dup?`<div class="aviso"><div><b>${dup} viagem(ns) já estão no sistema</b>Ficaram desmarcadas para não lançar duas vezes.</div></div>`:''}
+    ${semPlaca?`<div class="aviso"><div><b>Placa não encontrada em ${semPlaca} linha(s)</b>Escolha o caminhão nessas linhas antes de gravar.</div></div>`:''}
+    ${kmErr?`<div class="aviso info"><div><b>Km não bate em ${kmErr} linha(s)</b>Chegada − saída é diferente dos km anotados. Confira na foto.</div></div>`:''}
+    <div class="tw"><table class="prev"><thead><tr><th></th><th>Data</th><th>Placa</th><th>Rota</th><th class="n">Km saída</th><th class="n">Km chegada</th><th class="n">Km</th><th class="n">Bocas</th><th class="n">Carga</th><th>Obs.</th></tr></thead><tbody>
+    ${ls.map((l,i)=>`<tr class="${l.dup?'dup':''} ${l.importar?'':'off'}">
+      <td><input type="checkbox" class="chk" ${l.importar?'checked':''} onchange="IMP.linhas[${i}].importar=this.checked;desenharPrevia()" aria-label="Importar linha"></td>
+      <td><input class="inp" type="date" value="${l.data}" onchange="IMP.linhas[${i}].data=this.value" style="width:140px"></td>
+      <td><select class="inp" onchange="IMP.linhas[${i}].placa=this.value;desenharPrevia()" style="width:130px;${l.placa?'':'border-color:var(--wine)'}"><option value="">${esc(l.placaLida||'?')}</option>${optsPlaca(l.placa)}</select></td>
+      <td><input class="inp" value="${esc(l.rota)}" onchange="IMP.linhas[${i}].rota=this.value" style="width:110px"></td>
+      ${['kmSaida','kmChegada','km','bocas','carga'].map(k=>`<td><input class="inp num" inputmode="numeric" value="${l[k]||''}" onchange="IMP.linhas[${i}].${k}=int(this.value);desenharPrevia()" style="width:${k==='bocas'?'56px':'92px'}"></td>`).join('')}
+      <td><input class="inp" value="${esc(l.obs)}" onchange="IMP.linhas[${i}].obs=this.value" style="width:120px"></td>
+    </tr>`).join('')}
+    </tbody></table></div>
+    <div class="ajuda" style="margin-top:8px">${n} de ${ls.length} linha(s) serão gravadas · ${inteiro(soma(ls.filter(l=>l.importar),l=>l.km))} km.</div>`;
+}
+async function gravarImport(f){
+  const motId=f.mot.value, ls=(IMP&&IMP.linhas||[]).filter(l=>l.importar);
+  if(!motId){ toast('Escolha o motorista da folha.',true); return false; }
+  if(!ls.length){ toast('Nenhuma linha marcada para gravar.',true); return false; }
+  if(ls.some(l=>!l.placa||!l.data)){ toast('Há linhas sem placa ou sem data.',true); return false; }
+  if(preparandoFoto){ toast('Aguarde a foto terminar de carregar.',true); return false; }
+  try{
+    const batch=db.batch(); let fotoId='';
+    if(IMP.foto){ fotoId=uid(); batch.set(db.collection('fotos').doc(fotoId),{img:IMP.foto, tipo:'folha', motoristaId:motId, criado:Date.now()}); }
+    const agora=Date.now();
+    ls.forEach((l,i)=>batch.set(db.collection('viagens').doc(uid()+i),{data:l.data, motoristaId:motId, placa:fmtPlaca(l.placa), rota:l.rota, kmSaida:l.kmSaida, kmChegada:l.kmChegada, km:l.km, bocas:l.bocas, carga:l.carga, obs:l.obs, extra:false, valorExtra:0, fotoId, criado:agora+i}));
+    await batch.commit();
+    const ym=ls[0].data.slice(0,7); V.mes=ym; V.fMot=motId; V.fPlaca=''; pag='viagens'; history.replaceState(null,'','#viagens');
+    toast(ls.length+' viagem(ns) gravada(s)');
+  }catch(e){ console.error(e); erroSalvar(e); return false; }
+}
+
+/* ============================ VALES, FALTAS E FOLGAS ============================ */
+R.motoristas = () => {
+  const ym=V.mes; let ls=cad.lancs.filter(l=>noMes(l.data,ym)&&(!V.lMot||l.motoristaId===V.lMot)).sort((a,b)=>a.data.localeCompare(b.data));
+  const t=k=>soma(ls.filter(l=>l.tipo===k),l=>l.valor);
+  return `
+  <div class="head"><div><h1>Vales, faltas e folgas</h1><p>Lance cada vale, falta e folga no dia em que aconteceu. Receitas e descontos avulsos aparecem no holerite com a descrição que você digitar.</p></div>
+    <div class="tools">${seletorMes()}<button class="btn" onclick="formLanc()">${I.lancar}Novo lançamento</button></div></div>
+  <div class="tools" style="margin-bottom:12px"><select class="inp" onchange="V.lMot=this.value;render()" aria-label="Filtrar por motorista">${optsMot(V.lMot,'Todos os motoristas')}</select></div>
+  <div class="faixa">
+    <div><div class="l">Vales</div><div class="v money">${brl(t('vale'))}</div></div>
+    <div><div class="l">Faltas</div><div class="v money">${ls.filter(l=>l.tipo==='falta').length}</div><div class="s">${brl(t('falta'))} descontados</div></div>
+    <div><div class="l">Folgas</div><div class="v money">${ls.filter(l=>l.tipo==='folga').length}</div><div class="s">só registro</div></div>
+    <div><div class="l">Avulsos</div><div class="v money" style="font-size:20px">+${brl(t('receita'))}<br>−${brl(t('desconto'))}</div></div>
+  </div>
+  <div class="panel">${ls.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Motorista</th><th>Tipo</th><th class="hide-m">Descrição</th><th class="n">Valor</th><th></th></tr></thead><tbody>
+    ${ls.map(l=>{ const m=mot(l.motoristaId), T=TIPOS_LANC[l.tipo]||{nome:l.tipo,tag:'t-mut'}; return `<tr><td>${brCurto(l.data)}</td><td><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>
+      <td><span class="tag ${T.tag}">${T.nome}</span></td><td class="hide-m">${esc(l.desc||'')}</td>
+      <td class="n money ${T.semValor?'':T.desconto?'neg':'pos'}">${T.semValor?'<span class="muted">—</span>':(T.desconto?'−':'+')+brl(l.valor)}</td>
+      <td class="act"><button class="icon-btn" title="Editar" onclick="formLanc('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarLanc('${l.id}')">${I.lixo}</button></td></tr>`; }).join('')}
+    </tbody></table></div>`:`<div class="vazio">Nada lançado em ${mesNome(ym)}${V.lMot?' para esse motorista':''}.<br><button class="btn" onclick="formLanc()">Novo lançamento</button></div>`}</div>`;
+};
+function formLanc(id, tipoPadrao, motPadrao){
+  const l=id?cad.lancs.find(x=>x.id===id):{tipo:tipoPadrao||'vale', data:noMes(hoje(),V.mes)?hoje():V.mes+'-01', motoristaId:motPadrao||V.lMot||''};
+  if(!l) return;
+  if(!cad.motoristas.length){ toast('Cadastre um motorista primeiro.',true); return; }
+  abrirModal({titulo:id?'Editar lançamento':'Novo lançamento',
+    corpo:`<input type="hidden" name="tipo" value="${l.tipo}">
+    <div class="seg" id="segTipo" style="margin-top:8px">${Object.entries(TIPOS_LANC).map(([k,t])=>`<button type="button" class="${l.tipo===k?'on':''}" onclick="tipoLanc('${k}')">${t.nome.split(' ')[0]}</button>`).join('')}</div>
+    <div class="fg">
+      <label class="field"><span>Motorista</span><select class="inp" name="mot" required onchange="sugerirFalta()"><option value="">Escolha…</option>${optsMot(l.motoristaId)}</select></label>
+      <label class="field"><span>Data</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required></label>
+      <label class="field" id="lcValor"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}"></label>
+      <label class="field" id="lcDesc"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc||'')}"></label>
+    </div><div class="ajuda" id="lcAjuda"></div>`,
+    aoConfirmar:f=>{
+      const tipo=f.tipo.value, T=TIPOS_LANC[tipo];
+      const o={...l, tipo, motoristaId:f.mot.value, data:f.data.value, valor:T.semValor?0:num(f.valor.value), desc:f.desc.value.trim()};
+      if(!o.motoristaId||!o.data){ toast('Escolha o motorista e a data.',true); return false; }
+      if(!T.semValor && o.valor<=0){ toast('Informe o valor.',true); return false; }
+      if((tipo==='receita'||tipo==='desconto') && !o.desc){ toast('Escreva a descrição, ela aparece no holerite.',true); return false; }
+      if(id) Object.assign(l,o); else cad.lancs.push({id:uid(),...o});
+      salvar(); toast(T.nome+(id?' atualizado':' lançado'));
+    }});
+  tipoLanc(l.tipo, true);
+}
+function tipoLanc(t, inicio){
+  const f=$('mform'); f.tipo.value=t; const T=TIPOS_LANC[t];
+  [...$('segTipo').children].forEach(b=>b.classList.toggle('on', b.textContent===T.nome.split(' ')[0]));
+  $('lcValor').style.display=T.semValor?'none':'';
+  $('lcDesc').querySelector('span').textContent=(t==='receita'||t==='desconto')?'Descrição (aparece no holerite)':'Observação (opcional)';
+  $('lcAjuda').textContent={vale:'Desconta do salário no fechamento do mês.',falta:'Informe quanto descontar por esta falta. Sugestão: salário fixo ÷ 30.',folga:'Folga só fica registrada. Não desconta.',receita:'Soma no holerite, ex.: salário família, ajuda de custo.',desconto:'Desconta no holerite, ex.: adiantamento, multa.'}[t];
+  if(!inicio || t==='falta') sugerirFalta();
+}
+function sugerirFalta(){
+  const f=$('mform'); if(!f||f.tipo.value!=='falta'||num(f.valor.value)) return;
+  const m=cad.motoristas.find(x=>x.id===f.mot.value); if(m&&num(m.fixo)) f.valor.value=fmtInp(r2(num(m.fixo)/30));
+}
+function apagarLanc(id){
+  const l=cad.lancs.find(x=>x.id===id); if(!l) return;
+  confirmar('Apagar lançamento?', `${TIPOS_LANC[l.tipo].nome} de ${esc(mot(l.motoristaId).nome)} em ${br(l.data)}.`, 'Apagar', ()=>{ cad.lancs=cad.lancs.filter(x=>x.id!==id); salvar(); toast('Lançamento apagado'); });
+}
+
+/* ============================ FECHAMENTO ============================ */
+R.fechamento = () => {
+  const ym=V.mes, ms=ativosNoMes(ym), rs=ms.map(m=>calcMes(m.id,ym));
+  const tot=soma(rs,r=>r.liquido);
+  return `
+  <div class="head"><div><h1>Fechamento do mês</h1><p>Salário fixo + viagens extras + receitas avulsas − vales − faltas − descontos avulsos. Toque num motorista para ver o detalhe.</p></div>
+    <div class="tools">${seletorMes()}${rs.length?`<button class="btn sec" onclick="pdfHolerite(${JSON.stringify(ms.map(m=>m.id)).replace(/"/g,"'")})">${I.pdf}Todos em PDF</button>`:''}</div></div>
+  <div class="faixa">
+    <div><div class="l">Total a pagar</div><div class="v money">${brl(tot)}</div><div class="s">${rs.length} motorista(s)</div></div>
+    <div><div class="l">Salários fixos</div><div class="v money">${brl(soma(rs,r=>r.fixo))}</div></div>
+    <div><div class="l">Viagens extras</div><div class="v money">${brl(soma(rs,r=>r.valorExtras))}</div><div class="s">${soma(rs,r=>r.extras.length)} viagem(ns)</div></div>
+    <div><div class="l">Vales e descontos</div><div class="v money">${brl(soma(rs,r=>r.totDesc))}</div></div>
+  </div>
+  ${rs.length?rs.map(r=>cartaoHolerite(r)).join(''):`<div class="panel"><div class="vazio">Nenhum motorista ativo.</div></div>`}`;
+};
+function cartaoHolerite(r){
+  const id=r.m.id, ab=V.abertos[id];
+  const ln=(a,b,cls)=>`<div class="ln"><span>${a}</span><span class="money ${cls||''}">${b}</span></div>`;
+  return `<div class="holerite ${ab?'aberto':''}">
+    <div class="topo" onclick="V.abertos['${id}']=!V.abertos['${id}'];render()">${av(r.m)}
+      <div class="nome"><b>${esc(r.m.nome)}</b><span class="muted" style="font-size:13px">${r.viagens} viagem(ns) · ${inteiro(r.km)} km${r.extras.length?` · <span class="tag t-warn">${r.extras.length} extra(s)</span>`:''}${!r.fixo?' · <span class="tag t-bad">sem salário fixo</span>':''}</span></div>
+      <div class="liq"><div class="muted" style="font-size:12px">Líquido</div><div class="money">${brl(r.liquido)}</div></div></div>
+    <div class="corpo"><div>
+      <div class="bloco-t">A receber</div>
+      ${ln('Salário fixo',brl(r.fixo))}
+      ${r.extras.map(v=>ln(`Viagem extra ${brCurto(v.data)} · ${esc(fmtPlaca(v.placa))}${v.rota?' · '+esc(v.rota):''}`,brl(v.valorExtra),'pos')).join('')}
+      ${r.receitas.map(l=>ln(esc(l.desc)+` <span class="muted">(${brCurto(l.data)})</span>`,brl(l.valor),'pos')).join('')}
+      <div class="bloco-t">Descontos</div>
+      ${r.vales.map(l=>ln(`Vale em ${brCurto(l.data)}${l.desc?' · '+esc(l.desc):''}`,'−'+brl(l.valor),'neg')).join('')}
+      ${r.faltas.map(l=>ln(`Falta em ${brCurto(l.data)}${l.desc?' · '+esc(l.desc):''}`,'−'+brl(l.valor),'neg')).join('')}
+      ${r.descontos.map(l=>ln(esc(l.desc)+` <span class="muted">(${brCurto(l.data)})</span>`,'−'+brl(l.valor),'neg')).join('')}
+      ${!r.vales.length&&!r.faltas.length&&!r.descontos.length?'<div class="muted" style="padding:7px 0">Nenhum desconto no mês.</div>':''}
+      <div class="ln tot"><span>Salário líquido</span><span class="money">${brl(r.liquido)}</span></div>
+      ${r.folgas.length?`<div class="ajuda" style="margin-top:10px">Folgas no mês (não descontam): ${r.folgas.map(l=>brCurto(l.data)).join(', ')}.</div>`:''}
+    </div><div class="ajustes">
+      <div class="bloco-t">Lançar para ${esc(r.m.nome.split(' ')[0])}</div>
+      <div class="tools" style="margin-top:8px">
+        <button class="btn sm sec" onclick="formLanc(null,'vale','${id}')">Vale</button><button class="btn sm sec" onclick="formLanc(null,'falta','${id}')">Falta</button><button class="btn sm sec" onclick="formLanc(null,'folga','${id}')">Folga</button>
+        <button class="btn sm sec" onclick="formLanc(null,'receita','${id}')">Receita avulsa</button><button class="btn sm sec" onclick="formLanc(null,'desconto','${id}')">Desconto avulso</button>
+      </div>
+      <div class="bloco-t" style="margin-top:16px">Viagens do mês</div>
+      <div class="muted" style="font-size:13px">${r.viagens} viagem(ns), ${inteiro(r.km)} km. Para marcar extras, abra a lista de viagens.</div>
+      <div class="tools" style="margin-top:10px"><button class="btn sm sec" onclick="ir('viagens',{fMot:'${id}',fPlaca:''})">${I.viagens}Ver viagens</button><button class="btn sm" onclick="pdfHolerite(['${id}'])">${I.pdf}Holerite em PDF</button></div>
+    </div></div></div>`;
+}
+function pdfHolerite(ids){
+  if(!window.jspdf){ toast('O gerador de PDF ainda não carregou. Tente de novo em instantes.',true); return; }
+  const {jsPDF}=window.jspdf, ym=V.mes, doc=new jsPDF({unit:'mm',format:'a4'});
+  const PW=210, ML=18, MR=192; const tira=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const real=v=>'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  ids.forEach((id,idx)=>{
+    const r=calcMes(id,ym);
+    if(idx) doc.addPage();
+    doc.setFillColor(23,36,47); doc.rect(0,0,PW,26,'F');
+    doc.setTextColor(255,255,255); doc.setFont('times','bold'); doc.setFontSize(18); doc.text('Rodo W',ML,15);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.text('Caminhoes e motoristas',ML,20.5);
+    doc.setFontSize(10); doc.text('Holerite de '+tira(mesNome(ym)),MR,15,{align:'right'});
+    let y=38;
+    const novaPag=()=>{ if(y>270){ doc.addPage(); y=20; } };
+    doc.setTextColor(23,36,47); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text(tira(r.m.nome),ML,y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,110,120);
+    doc.text(`${r.viagens} viagem(ns) no mes  |  ${inteiro(r.km)} km`,ML,y+5.5); y+=14;
+    const sec=t=>{ novaPag(); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(29,90,122); doc.text(t,ML,y); y+=5.5; };
+    const ln=(a,b,neg)=>{ novaPag(); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(60,70,80); doc.text(tira(a),ML,y); doc.setTextColor(neg?178:23,neg?58:36,neg?72:47); doc.text((neg?'- ':'')+real(b),MR,y,{align:'right'}); doc.setDrawColor(226,231,235); doc.setLineWidth(0.2); doc.line(ML,y+2,MR,y+2); y+=7; };
+    sec('A RECEBER'); ln('Salario fixo',r.fixo);
+    r.extras.forEach(v=>ln(`Viagem extra ${brCurto(v.data)} - ${fmtPlaca(v.placa)}${v.rota?' - '+v.rota:''}`,v.valorExtra));
+    r.receitas.forEach(l=>ln(`${l.desc} (${brCurto(l.data)})`,l.valor));
+    y+=3; sec('DESCONTOS');
+    r.vales.forEach(l=>ln(`Vale em ${br(l.data)}${l.desc?' ('+l.desc+')':''}`,l.valor,true));
+    r.faltas.forEach(l=>ln(`Falta em ${br(l.data)}${l.desc?' ('+l.desc+')':''}`,l.valor,true));
+    r.descontos.forEach(l=>ln(`${l.desc} (${brCurto(l.data)})`,l.valor,true));
+    if(!r.vales.length&&!r.faltas.length&&!r.descontos.length){ doc.setFontSize(9); doc.setTextColor(130,140,150); doc.text('Nenhum desconto no mes',ML,y); y+=7; }
+    y+=2; novaPag(); doc.setFillColor(229,239,245); doc.rect(ML,y-5,MR-ML,11,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(23,36,47); doc.text('Salario liquido',ML+3,y+2.5); doc.text(real(r.liquido),MR-3,y+2.5,{align:'right'}); y+=14;
+    if(r.folgas.length){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,110,120); doc.text('Folgas no mes (nao descontam): '+r.folgas.map(l=>brCurto(l.data)).join(', '),ML,y); y+=8; }
+    y=Math.max(y+18,250); if(y>275){ doc.addPage(); y=40; }
+    doc.setDrawColor(23,36,47); doc.setLineWidth(0.4); doc.line(ML,y,ML+70,y); doc.line(MR-70,y,MR,y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,110,120);
+    doc.text('Rodo W',ML,y+5); doc.text(tira(r.m.nome),MR-70,y+5);
+    doc.text('Emitido em '+br(hoje()),PW/2,y+14,{align:'center'});
+  });
+  const nome = ids.length===1 ? 'holerite_'+tira(mot(ids[0]).nome).toLowerCase().replace(/\s+/g,'_')+'_'+ym : 'holerites_'+ym;
+  doc.save(nome+'.pdf'); toast('PDF baixado');
+}
+
+/* ============================ MANUTENÇÃO ============================ */
+R.manutencao = () => {
+  const ym=V.mes, gm=gastos.filter(g=>noMes(g.data,ym));
+  const lista=(V.gPlaca?gastos.filter(g=>normPlaca(g.placa)===normPlaca(V.gPlaca)):gm).sort((a,b)=>b.data.localeCompare(a.data));
+  const meses=[0,-1,-2,-3,-4,-5].map(n=>somaMes(ym,n)).reverse();
+  const placas=cad.caminhoes.filter(c=>c.ativo!==false||gastos.some(g=>normPlaca(g.placa)===normPlaca(c.placa)));
+  const tot=(p,m)=>soma(gastos.filter(g=>normPlaca(g.placa)===normPlaca(p)&&noMes(g.data,m)),g=>g.valor);
+  const porTipo=TIPOS_GASTO.map(t=>[t,soma(gm.filter(g=>g.tipo===t),g=>g.valor)]).filter(x=>x[1]);
+  return `
+  <div class="head"><div><h1>Manutenção</h1><p>Gastos de cada caminhão, com total por placa e por mês.</p></div>
+    <div class="tools">${seletorMes()}<button class="btn" onclick="formGasto()">${I.lancar}Novo gasto</button></div></div>
+  <div class="faixa">
+    <div><div class="l">Gasto no mês</div><div class="v money">${brl(soma(gm,g=>g.valor))}</div><div class="s">${gm.length} lançamento(s)</div></div>
+    ${[0,1,2].map(i=>porTipo[i]?`<div><div class="l">${porTipo[i][0]}</div><div class="v money">${brl(porTipo[i][1])}</div></div>`:`<div><div class="l">&nbsp;</div><div class="v money muted">—</div></div>`).join('')}
+  </div>
+  <div class="panel"><div class="panel-h"><div><h2>Total por caminhão</h2><p class="sub">Últimos 6 meses. Toque numa placa para ver o histórico completo dela.</p></div></div>
+    <div class="tw"><table><thead><tr><th>Placa</th>${meses.map(m=>`<th class="n ${m===ym?'':'hide-m'}">${MESES[+m.slice(5)-1].slice(0,3)}/${m.slice(2,4)}</th>`).join('')}<th class="n">6 meses</th></tr></thead><tbody>
+    ${placas.map(c=>`<tr style="cursor:pointer" onclick="V.gPlaca='${esc(c.placa)}';render()"><td>${placaTag(c.placa)}</td>${meses.map(m=>{const v=tot(c.placa,m);return `<td class="n ${m===ym?'':'hide-m'}">${v?brl(v):'<span class="muted">—</span>'}</td>`;}).join('')}<td class="n money"><b>${brl(soma(meses,m=>tot(c.placa,m)))}</b></td></tr>`).join('')}
+    </tbody><tfoot><tr><td>Total</td>${meses.map(m=>`<td class="n ${m===ym?'':'hide-m'}">${brl(soma(placas,c=>tot(c.placa,m)))}</td>`).join('')}<td class="n money">${brl(soma(placas,c=>soma(meses,m=>tot(c.placa,m))))}</td></tr></tfoot></table></div>
+  </div>
+  <div class="panel"><div class="panel-h"><div><h2>${V.gPlaca?'Histórico do '+esc(fmtPlaca(V.gPlaca)):'Gastos de '+mesNome(ym)}</h2><p class="sub">${V.gPlaca?'Todos os gastos desta placa, do mais recente para o mais antigo.':'Lançamentos do mês.'}</p></div>
+    <select class="inp" style="width:auto" onchange="V.gPlaca=this.value;render()" aria-label="Filtrar por caminhão">${optsPlaca(V.gPlaca,'Mês selecionado (todas as placas)')}</select></div>
+    ${lista.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Placa</th><th>Tipo</th><th class="hide-m">Descrição</th><th class="hide-m">Oficina</th><th class="n hide-m">Km</th><th class="n">Valor</th><th></th></tr></thead><tbody>
+    ${lista.map(g=>`<tr><td>${br(g.data)}</td><td>${placaTag(g.placa)}</td><td><span class="tag t-acc">${esc(g.tipo)}</span></td><td class="hide-m">${esc(g.desc||'')}</td><td class="hide-m">${esc(g.oficina||'')}</td><td class="n hide-m">${g.km?inteiro(g.km):''}</td><td class="n money">${brl(g.valor)}</td>
+      <td class="act">${g.fotoId?`<button class="icon-btn" title="Ver nota" onclick="verFoto('${g.fotoId}')">${I.foto}</button>`:''}<button class="icon-btn" title="Editar" onclick="formGasto('${g.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarGasto('${g.id}')">${I.lixo}</button></td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="6" class="hide-m">Total</td><td class="nc" colspan="3">Total</td><td class="n money">${brl(soma(lista,g=>g.valor))}</td><td></td></tr></tfoot></table></div>`
+    :`<div class="vazio">Nenhum gasto ${V.gPlaca?'nesta placa':'neste mês'}.<br><button class="btn" onclick="formGasto()">Lançar gasto</button></div>`}
+  </div>`;
+};
+let fotoGasto=null, preparandoFoto=false;
+function formGasto(id){
+  const g=id?gastos.find(x=>x.id===id):{data:noMes(hoje(),V.mes)?hoje():V.mes+'-01', placa:V.gPlaca||'', tipo:'Mecânica'};
+  if(!g) return; fotoGasto=null;
+  abrirModal({titulo:id?'Editar gasto':'Novo gasto de manutenção', larg:'600px',
+    corpo:`<div class="fg">
+      <label class="field"><span>Data</span><input class="inp" type="date" name="data" value="${esc(g.data)}" required></label>
+      <label class="field"><span>Caminhão</span><select class="inp" name="placa" required><option value="">Escolha…</option>${optsPlaca(g.placa)}</select></label>
+      <label class="field"><span>Tipo</span><select class="inp" name="tipo">${TIPOS_GASTO.map(t=>`<option ${g.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(g.valor)}" required></label>
+      <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(g.desc||'')}" placeholder="Ex.: troca de 2 pneus dianteiros"></label>
+      <label class="field"><span>Oficina / fornecedor</span><input class="inp" name="oficina" value="${esc(g.oficina||'')}"></label>
+      <label class="field"><span>Km do caminhão</span><input class="inp num" name="km" inputmode="numeric" value="${g.km||''}"></label>
+      <label class="field full"><span>Foto da nota (opcional)${g.fotoId?' · já tem uma foto, escolha outra só para trocar':''}</span><input class="inp" type="file" name="foto" accept="image/*" onchange="lerFotoGasto(this)"></label>
+    </div><div id="gFoto"></div>`,
+    aoConfirmar:async f=>{
+      const o={...g, data:f.data.value, placa:fmtPlaca(f.placa.value), tipo:f.tipo.value, valor:num(f.valor.value), desc:f.desc.value.trim(), oficina:f.oficina.value.trim(), km:int(f.km.value)};
+      if(!o.data||!o.placa){ toast('Preencha a data e o caminhão.',true); return false; }
+      if(o.valor<=0){ toast('Informe o valor.',true); return false; }
+      if(preparandoFoto){ toast('Aguarde a foto terminar de carregar.',true); return false; }
+      if(fotoGasto){ const fid=uid(); await gravar('fotos',{id:fid, img:fotoGasto, tipo:'nota', placa:o.placa, criado:Date.now()}); o.fotoId=fid; }
+      if(!id) o.criado=Date.now();
+      await gravar('manutencoes',o); toast(id?'Gasto atualizado':'Gasto lançado');
+    }});
+}
+async function lerFotoGasto(inp){
+  const f=inp.files&&inp.files[0]; if(!f){ fotoGasto=null; $('gFoto').innerHTML=''; return; }
+  preparandoFoto=true;
+  try{ fotoGasto=await comprimir(f); $('gFoto').innerHTML=`<img class="fotoprev" src="${fotoGasto}" alt="Foto da nota">`; }
+  catch(e){ fotoGasto=null; toast('Não foi possível ler essa foto.',true); }
+  preparandoFoto=false;
+}
+function apagarGasto(id){
+  const g=gastos.find(x=>x.id===id); if(!g) return;
+  confirmar('Apagar este gasto?', `${esc(g.tipo)} de ${brl(g.valor)} no ${esc(fmtPlaca(g.placa))} em ${br(g.data)}.`, 'Apagar', async()=>{ await apagarDoc('manutencoes',id); toast('Gasto apagado'); });
+}
+
+/* ============================ CADASTROS ============================ */
+R.cadastros = () => `
+  <div class="head"><div><h1>Motoristas e caminhões</h1><p>Um caminhão pode rodar com motoristas diferentes; cada viagem guarda o motorista e a placa.</p></div></div>
+  <div class="grid2">
+  <div class="panel"><div class="panel-h"><div><h2>Motoristas</h2><p class="sub">O salário fixo entra no fechamento de cada mês.</p></div><button class="btn sm" onclick="formMot()">${I.lancar}Novo</button></div>
+    <div class="tw"><table><thead><tr><th>Nome</th><th class="n">Salário fixo</th><th></th></tr></thead><tbody>
+    ${cad.motoristas.map(m=>`<tr><td><span class="pessoa">${av(m)}${esc(m.nome)}${m.ativo===false?' <span class="tag t-mut">inativo</span>':''}</span></td><td class="n money">${num(m.fixo)?brl(m.fixo):'<span class="tag t-bad">não informado</span>'}</td>
+      <td class="act"><button class="icon-btn" title="Editar" onclick="formMot('${m.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarMot('${m.id}')">${I.lixo}</button></td></tr>`).join('')}
+    </tbody></table></div></div>
+  <div class="panel"><div class="panel-h"><div><h2>Caminhões</h2><p class="sub">A placa liga as viagens e os gastos de manutenção.</p></div><button class="btn sm" onclick="formCam()">${I.lancar}Novo</button></div>
+    <div class="tw"><table><thead><tr><th>Placa</th><th>Tipo</th><th class="hide-m">Modelo</th><th></th></tr></thead><tbody>
+    ${['racao','leite'].flatMap(t=>cad.caminhoes.filter(c=>c.tipo===t)).map(c=>`<tr><td>${placaTag(c.placa)}${c.ativo===false?' <span class="tag t-mut">inativo</span>':''}</td><td>${tipoNome(c.tipo)}</td><td class="hide-m">${esc(c.modelo||'')}</td>
+      <td class="act"><button class="icon-btn" title="Editar" onclick="formCam('${c.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCam('${c.id}')">${I.lixo}</button></td></tr>`).join('')}
+    </tbody></table></div></div>
+  </div>`;
+function formMot(id){
+  const m=id?cad.motoristas.find(x=>x.id===id):{nome:'',fixo:0,ativo:true};
+  abrirModal({titulo:id?'Editar motorista':'Novo motorista',
+    corpo:`<label class="field"><span>Nome</span><input class="inp" name="nome" value="${esc(m.nome)}" required></label>
+    <label class="field"><span>Salário fixo mensal (R$)</span><input class="inp num" name="fixo" inputmode="decimal" value="${fmtInp(m.fixo)}"></label>
+    <label class="toggle"><input type="checkbox" name="ativo" ${m.ativo!==false?'checked':''}> Ativo (aparece nos lançamentos e no fechamento)</label>`,
+    aoConfirmar:f=>{ const nome=f.nome.value.trim(); if(!nome){ toast('Digite o nome.',true); return false; }
+      const o={nome, fixo:num(f.fixo.value), ativo:f.ativo.checked};
+      if(id) Object.assign(m,o); else cad.motoristas.push({id:uid(),...o});
+      salvar(); toast('Motorista salvo'); }});
+}
+function apagarMot(id){
+  const m=cad.motoristas.find(x=>x.id===id); if(!m) return;
+  const usado=viagens.some(v=>v.motoristaId===id)||cad.lancs.some(l=>l.motoristaId===id);
+  if(usado){ abrirModal({titulo:'Não dá para apagar', desc:`${esc(m.nome)} tem viagens ou lançamentos gravados. Para tirar das listas, edite e desmarque “Ativo”.`, ok:'', cancelar:'Entendi'}); return; }
+  confirmar('Apagar '+esc(m.nome)+'?','O motorista sai do cadastro.','Apagar',()=>{ cad.motoristas=cad.motoristas.filter(x=>x.id!==id); salvar(); toast('Motorista apagado'); });
+}
+function formCam(id){
+  const c=id?cad.caminhoes.find(x=>x.id===id):{placa:'',tipo:'leite',modelo:'',ativo:true};
+  abrirModal({titulo:id?'Editar caminhão':'Novo caminhão',
+    corpo:`<div class="fg"><label class="field"><span>Placa</span><input class="inp" name="placa" value="${esc(c.placa)}" required style="text-transform:uppercase"></label>
+    <label class="field"><span>Tipo</span><select class="inp" name="tipo"><option value="leite" ${c.tipo==='leite'?'selected':''}>Leite</option><option value="racao" ${c.tipo==='racao'?'selected':''}>Ração</option></select></label>
+    <label class="field full"><span>Modelo (opcional)</span><input class="inp" name="modelo" value="${esc(c.modelo||'')}" placeholder="Ex.: toco, truck, VW 24.280"></label></div>
+    <label class="toggle"><input type="checkbox" name="ativo" ${c.ativo!==false?'checked':''}> Ativo</label>`,
+    aoConfirmar:f=>{ const p=fmtPlaca(f.placa.value); if(normPlaca(p).length<7){ toast('Placa incompleta.',true); return false; }
+      if(cad.caminhoes.some(x=>x.id!==id&&normPlaca(x.placa)===normPlaca(p))){ toast('Essa placa já está cadastrada.',true); return false; }
+      const antiga=c.placa, o={placa:p, tipo:f.tipo.value, modelo:f.modelo.value.trim(), ativo:f.ativo.checked};
+      if(id) Object.assign(c,o); else cad.caminhoes.push({id:uid(),...o});
+      salvar(); toast('Caminhão salvo');
+      if(id && antiga && normPlaca(antiga)!==normPlaca(p)) trocarPlaca(antiga,p); }});
+}
+async function trocarPlaca(de, para){
+  const vs=viagens.filter(v=>normPlaca(v.placa)===normPlaca(de)), gs=gastos.filter(g=>normPlaca(g.placa)===normPlaca(de));
+  if(!vs.length&&!gs.length) return;
+  try{ const b=db.batch(); vs.forEach(v=>b.set(db.collection('viagens').doc(v.id),{placa:para},{merge:true})); gs.forEach(g=>b.set(db.collection('manutencoes').doc(g.id),{placa:para},{merge:true}));
+    await b.commit(); toast(`Placa corrigida em ${vs.length} viagem(ns) e ${gs.length} gasto(s)`); }catch(e){ erroSalvar(e); }
+}
+function apagarCam(id){
+  const c=cad.caminhoes.find(x=>x.id===id); if(!c) return;
+  const usado=viagens.some(v=>normPlaca(v.placa)===normPlaca(c.placa))||gastos.some(g=>normPlaca(g.placa)===normPlaca(c.placa));
+  if(usado){ abrirModal({titulo:'Não dá para apagar', desc:`O ${esc(c.placa)} tem viagens ou gastos gravados. Para tirar das listas, edite e desmarque “Ativo”.`, ok:'', cancelar:'Entendi'}); return; }
+  confirmar('Apagar '+esc(c.placa)+'?','O caminhão sai do cadastro.','Apagar',()=>{ cad.caminhoes=cad.caminhoes.filter(x=>x.id!==id); salvar(); toast('Caminhão apagado'); });
+}
+
+/* ============================ MINHA CONTA ============================ */
+R.conta = () => `
+  <div class="head"><div><h1>Minha conta</h1><p>Senha, cópia de segurança e saída.</p></div></div>
+  <div class="panel"><h2>Conta</h2><p class="sub">${esc(auth.currentUser?auth.currentUser.email:'')}</p>
+    <div class="tools"><button class="btn sec" onclick="trocarSenha()">Trocar senha por e-mail</button><button class="btn danger" onclick="sair()">Sair</button></div></div>
+  <div class="panel"><h2>Cópia de segurança</h2><p class="sub">Baixa um arquivo com motoristas, caminhões, lançamentos, viagens e gastos (sem as fotos). Guarde uma vez por mês.</p>
+    <button class="btn" onclick="baixarBackup()">${I.pdf}Baixar cópia</button></div>`;
+function baixarBackup(){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify({gerado:new Date().toISOString(), cadastros:cad, viagens, manutencoes:gastos},null,1)],{type:'application/json'})); a.download='rodow-caminhoes-'+hoje()+'.json'; a.click(); toast('Cópia baixada'); }
+async function trocarSenha(){ try{ await auth.sendPasswordResetEmail(auth.currentUser.email); toast('Enviamos o link para '+auth.currentUser.email); }catch(e){ toast('Não foi possível enviar o e-mail.',true); } }
+
+/* ============================ LOGIN ============================ */
+function msgLogin(t,tipo){ const m=$('lgMsg'); m.textContent=t; m.className='msg '+(tipo||''); }
+async function entrar(){
+  const e=$('lgEmail').value.trim().toLowerCase(), s=$('lgSenha').value; $('lgBtn').disabled=true; msgLogin('');
+  try{ await auth.signInWithEmailAndPassword(e,s); }
+  catch(err){ const c=err.code||''; msgLogin(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?'E-mail ou senha incorretos.':c==='auth/too-many-requests'?'Muitas tentativas. Aguarde alguns minutos.':c==='auth/network-request-failed'?'Sem conexão com a internet.':'Não foi possível entrar.','err'); }
+  $('lgBtn').disabled=false;
+}
+async function esqueciSenha(){
+  const e=$('lgEmail').value.trim().toLowerCase(); if(!e){ msgLogin('Digite seu e-mail no campo acima e clique de novo.','err'); $('lgEmail').focus(); return; }
+  try{ await auth.sendPasswordResetEmail(e); msgLogin('Se esse e-mail tiver acesso, enviamos um link para '+e+'. Veja também a caixa de spam.','ok'); }
+  catch(err){ msgLogin('Não foi possível enviar o e-mail para esse endereço.','err'); }
+}
+function sair(){ fecharMais(); unsubs.forEach(u=>u()); unsubs=[]; auth.signOut().then(()=>location.reload()); }
+
+(function iniciar(){
+  if(typeof firebase==='undefined'){ document.body.innerHTML='<p style="padding:32px;font-family:sans-serif">Não foi possível carregar o sistema. Verifique a internet e recarregue a página.</p>'; return; }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth=firebase.auth(); db=firebase.firestore(); cadRef=db.collection('dados').doc('cadastros');
+  const h=(location.hash||'').slice(1); if(PAGS.some(p=>p.id===h)) pag=h;
+  auth.onAuthStateChanged(u=>{
+    if(u){ $('login').style.display='none'; $('app').style.display='block'; $('contaEmail').textContent=u.email; escutar(); }
+    else { $('app').style.display='none'; $('login').style.display='grid'; }
+  });
+  window.addEventListener('beforeunload',e=>{ if(pendente){ e.preventDefault(); e.returnValue=''; } });
+})();
+</script>
+</body>
+</html>
