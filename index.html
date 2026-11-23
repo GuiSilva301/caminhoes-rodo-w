@@ -396,7 +396,9 @@ const I = {
    ================================================================== */
 const noMes = (d,ym) => String(d||'').startsWith(ym);
 function viagensDe(motId, ym){ return viagens.filter(v=>v.motoristaId===motId && noMes(v.data,ym)).sort(ordViagem); }
-function lancsDe(motId, ym, tipo){ return cad.lancs.filter(l=>l.motoristaId===motId && noMes(l.data,ym) && (!tipo||l.tipo===tipo)).sort((a,b)=>a.data.localeCompare(b.data)); }
+/* Mês do holerite em que o lançamento entra: o "referente ao mês" escolhido ou, se não tiver, o mês da data. */
+const mesRef = l => (l.tipo!=='comissao' && l.ref) ? l.ref : String(l.data||'').slice(0,7);
+function lancsDe(motId, ym, tipo){ return cad.lancs.filter(l=>l.motoristaId===motId && mesRef(l)===ym && (!tipo||l.tipo===tipo)).sort((a,b)=>a.data.localeCompare(b.data)); }
 function ordViagem(a,b){ return (a.data||'').localeCompare(b.data||'') || (Number(a.kmSaida)||0)-(Number(b.kmSaida)||0) || (a.criado||0)-(b.criado||0); }
 /* Admissão e desligamento: no mês em que entrou ou saiu, o salário fixo é
    proporcional aos dias (fixo ÷ 30 × dias). Fora do período, não recebe nada. */
@@ -434,7 +436,7 @@ const quando = l => l.mensal ? 'todo mês' : brCurto(l.data);
 const SUGESTOES = ['Vale transporte','Vale refeição','Vale alimentação','Cesta básica','Salário família','Ajuda de custo','Diária de viagem','Plano de saúde','Desconto vale transporte (6%)','Adiantamento','Pensão alimentícia','Empréstimo'];
 const datalistSug = () => `<datalist id="sugDesc">${SUGESTOES.map(x=>`<option value="${x}">`).join('')}</datalist>`;
 function ativosNoMes(ym){
-  return cad.motoristas.filter(m=>(m.ativo!==false && periodo(m,ym).dentro) || viagens.some(v=>v.motoristaId===m.id&&noMes(v.data,ym)) || cad.lancs.some(l=>l.motoristaId===m.id&&noMes(l.data,ym)));
+  return cad.motoristas.filter(m=>(m.ativo!==false && periodo(m,ym).dentro) || viagens.some(v=>v.motoristaId===m.id&&noMes(v.data,ym)) || cad.lancs.some(l=>l.motoristaId===m.id&&mesRef(l)===ym));
 }
 
 /* ============================ DADOS ============================ */
@@ -801,7 +803,7 @@ async function gravarImport(f){
 
 /* ============================ VALES, FALTAS E FOLGAS ============================ */
 R.motoristas = () => {
-  const ym=V.mes; let ls=cad.lancs.filter(l=>noMes(l.data,ym)&&(!V.lMot||l.motoristaId===V.lMot)).sort((a,b)=>a.data.localeCompare(b.data)||tempo(a)-tempo(b));
+  const ym=V.mes; let ls=cad.lancs.filter(l=>mesRef(l)===ym&&(!V.lMot||l.motoristaId===V.lMot)).sort((a,b)=>a.data.localeCompare(b.data)||tempo(a)-tempo(b));
   const t=k=>soma(ls.filter(l=>l.tipo===k),l=>l.valor);
   return `
   <div class="head"><div><h1>Vales, faltas e folgas</h1><p>Lance cada vale, falta e folga no dia em que aconteceu. Receitas e descontos avulsos aparecem no holerite com a descrição que você digitar.</p></div>
@@ -814,7 +816,7 @@ R.motoristas = () => {
     <div><div class="l">Comissões e avulsos</div><div class="v money" style="font-size:20px">+${brl(t('comissao')+t('receita'))}<br>−${brl(t('desconto'))}</div></div>
   </div>
   <div class="panel">${ls.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Motorista</th><th>Tipo</th><th class="hide-m">Descrição</th><th class="n">Valor</th><th></th></tr></thead><tbody>
-    ${ls.map(l=>{ const m=mot(l.motoristaId), T=TIPOS_LANC[l.tipo]||{nome:l.tipo,tag:'t-mut'}; return `<tr><td>${ehComissao(l)?`ref. ${refTxt(l.data.slice(0,7))}<div class="muted" style="font-size:12px">paga ${brCurto(pagamentoComissao(l))}</div>`:brCurto(l.data)}</td><td><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>
+    ${ls.map(l=>{ const m=mot(l.motoristaId), T=TIPOS_LANC[l.tipo]||{nome:l.tipo,tag:'t-mut'}; return `<tr><td>${ehComissao(l)?`ref. ${refTxt(l.data.slice(0,7))}<div class="muted" style="font-size:12px">paga ${brCurto(pagamentoComissao(l))}</div>`:brCurto(l.data)+(mesRef(l)!==l.data.slice(0,7)?`<div class="muted" style="font-size:12px">ref. ${refTxt(mesRef(l))}</div>`:'')}</td><td><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>
       <td><span class="tag ${T.tag}">${T.nome}</span></td><td class="hide-m">${esc(l.desc||'')}${clipBtn(l.anexos)}</td>
       <td class="n money ${T.semValor?'':T.desconto?'neg':'pos'}">${T.semValor?'<span class="muted">—</span>':(T.desconto?'−':'+')+brl(l.valor)}</td>
       <td class="act"><button class="icon-btn" title="Editar" onclick="formLanc('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarLanc('${l.id}')">${I.lixo}</button></td></tr>`; }).join('')}
@@ -829,8 +831,8 @@ function formLanc(id, tipoPadrao, motPadrao, descPadrao){
     <div class="seg" id="segTipo" style="margin-top:8px">${Object.entries(TIPOS_LANC).map(([k,t])=>`<button type="button" class="${l.tipo===k?'on':''}" onclick="tipoLanc('${k}')">${t.nome.split(' ')[0]}</button>`).join('')}</div>
     <div class="fg">
       <label class="field"><span>Motorista</span><select class="inp" name="mot" required onchange="sugerirFalta()"><option value="">Escolha…</option>${optsMot(l.motoristaId)}</select></label>
-      <label class="field" id="lcData"><span>Data</span><input class="inp" type="date" name="data" value="${esc(l.data)}"></label>
-      <label class="field" id="lcRef"><span>Referente ao mês (holerite)</span><input class="inp" type="month" name="ref" value="${esc((l.data||'').slice(0,7))}" onchange="sugerirPagamento(true)"></label>
+      <label class="field" id="lcData"><span>Data (quando aconteceu)</span><input class="inp" type="date" name="data" value="${esc(l.data)}" onchange="if(!this.form.ref.dataset.mexeu&&this.value) this.form.ref.value=this.value.slice(0,7)"></label>
+      <label class="field" id="lcRef"><span>Referente ao mês (holerite)</span><input class="inp" type="month" name="ref" value="${esc(mesRef(l))}" onchange="this.dataset.mexeu=1;sugerirPagamento(true)"></label>
       <label class="field" id="lcPag"><span>Data do pagamento</span><input class="inp" type="date" name="pag" value="${esc(l.pagamento||'')}" oninput="this.dataset.mexeu=1"></label>
       <label class="field" id="lcValor"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}"></label>
       <label class="field" id="lcDesc"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc||'')}" list="sugDesc" autocomplete="off"></label>
@@ -839,7 +841,7 @@ function formLanc(id, tipoPadrao, motPadrao, descPadrao){
       const tipo=f.tipo.value, T=TIPOS_LANC[tipo];
       const com=tipo==='comissao';
       const o={...l, tipo, motoristaId:f.mot.value, data:com?(f.ref.value?f.ref.value+'-01':''):f.data.value, valor:T.semValor?0:num(f.valor.value), desc:f.desc.value.trim()};
-      if(com) o.pagamento=f.pag.value; else delete o.pagamento;
+      if(com){ o.pagamento=f.pag.value; delete o.ref; } else { delete o.pagamento; o.ref=f.ref.value||(o.data||'').slice(0,7); }
       if(!o.motoristaId||!o.data){ toast(com?'Escolha o motorista e o mês de referência.':'Escolha o motorista e a data.',true); return false; }
       if(com && !o.pagamento){ toast('Informe a data do pagamento da comissão.',true); return false; }
       if(!T.semValor && o.valor<=0){ toast('Informe o valor.',true); return false; }
@@ -854,11 +856,12 @@ function tipoLanc(t, inicio){
   const f=$('mform'); f.tipo.value=t; const T=TIPOS_LANC[t];
   [...$('segTipo').children].forEach(b=>b.classList.toggle('on', b.textContent===T.nome.split(' ')[0]));
   $('lcValor').style.display=T.semValor?'none':'';
-  const com=t==='comissao'; $('lcData').style.display=com?'none':''; $('lcRef').style.display=com?'':'none'; $('lcPag').style.display=com?'':'none';
+  const com=t==='comissao'; $('lcData').style.display=com?'none':''; $('lcPag').style.display=com?'':'none';
+  if(!f.ref.value) f.ref.value=(f.data.value||V.mes+'-01').slice(0,7);
   if(com){ if(!f.ref.value) f.ref.value=(f.data.value||V.mes).slice(0,7); sugerirPagamento(false); }
   else if(!f.data.value && f.ref.value) f.data.value=f.ref.value+'-01';
   $('lcDesc').querySelector('span').textContent=(t==='receita'||t==='desconto')?'Descrição (aparece no holerite)':'Observação (opcional)';
-  $('lcAjuda').textContent={vale:'Dinheiro adiantado ao motorista. Desconta do salário no fechamento do mês.',falta:'Informe quanto descontar por esta falta. Sugestão: salário fixo ÷ 30.',folga:'Folga só fica registrada. Não desconta.',comissao:'Entra no holerite do mês de referência. No fluxo de caixa ela sai sozinha na data do pagamento, separada do salário e das viagens extras.',receita:'Soma no holerite só neste mês, ex.: vale transporte, vale refeição, salário família. Para repetir todo mês, cadastre no motorista.',desconto:'Desconta no holerite só neste mês, ex.: desconto do vale transporte, multa. Para repetir todo mês, cadastre no motorista.'}[t];
+  $('lcAjuda').textContent=(com?'':'A data é o dia em que aconteceu; o “referente ao mês” é o holerite em que entra (ex.: descontado em 13/11, referente a outubro). ')+{vale:'Vale: o dinheiro sai do caixa na data; o desconto entra no holerite do mês de referência.',falta:'Informe quanto descontar por esta falta. Sugestão: salário fixo ÷ 30.',folga:'Folga só fica registrada. Não desconta.',comissao:'Entra no holerite do mês de referência. No fluxo de caixa ela sai sozinha na data do pagamento, separada do salário e das viagens extras.',receita:'Soma no holerite só neste mês, ex.: vale transporte, vale refeição, salário família. Para repetir todo mês, cadastre no motorista.',desconto:'Desconta no holerite só neste mês, ex.: desconto do vale transporte, multa. Para repetir todo mês, cadastre no motorista.'}[t];
   if(!inicio || t==='falta') sugerirFalta();
 }
 function sugerirPagamento(forcar){
