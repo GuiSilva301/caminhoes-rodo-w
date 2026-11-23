@@ -1071,7 +1071,7 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
@@ -1101,13 +1101,14 @@ function formCaixa(id){
       <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc)}" placeholder="Ex.: parcela do caminhão, salários, frete da Calp" required></label>
       <label class="field"><span>Dia</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required ${id?'':`onchange="this.form.pago.checked=this.value.slice(0,7)<mesAtual()"`}></label>
       <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}" required></label>
+      <label class="field full"><span>Referente ao mês (opcional)</span><input class="inp" type="month" name="ref" value="${esc(l.ref||'')}"><span class="ajuda" style="display:block;font-weight:400">Ex.: pagamento feito em novembro referente ao trabalho de outubro.</span></label>
     </div>
     <label class="toggle"><input type="checkbox" name="pago" ${l.pago?'checked':''}> Já foi pago / recebido</label>
     <div class="ajuda">Pode lançar contas de meses passados: o lançamento vai para o mês da data escolhida.</div>
     ${campoAnexos(l.anexos)}`,
     extra:id?`<button type="button" class="btn danger" style="margin-right:auto" onclick="apagarCaixa('${id}')">${I.lixo}Apagar</button>`:'',
     aoConfirmar:async f=>{
-      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked};
+      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||''};
       if(!o.desc||!o.data){ toast('Preencha a descrição e o dia.',true); return false; }
       if(o.valor<=0){ toast('Informe o valor.',true); return false; }
       try{ o.anexos=await salvarAnexos('caixa'); }catch(e){ return false; }
@@ -1419,8 +1420,42 @@ R.conta = () => `
   <div class="panel"><h2>Conta</h2><p class="sub">${esc(auth.currentUser?auth.currentUser.email:'')}</p>
     <div class="tools"><button class="btn sec" onclick="trocarSenha()">Trocar senha por e-mail</button><button class="btn danger" onclick="sair()">Sair</button></div></div>
   <div class="panel"><h2>Cópia de segurança</h2><p class="sub">Baixa um arquivo com motoristas, caminhões, lançamentos, viagens e gastos (sem as fotos). Guarde uma vez por mês.</p>
-    <button class="btn" onclick="baixarBackup()">${I.pdf}Baixar cópia</button></div>`;
+    <button class="btn" onclick="baixarBackup()">${I.pdf}Baixar cópia</button></div>
+  <div class="panel" style="border-color:var(--winebg)"><h2>Começar do zero</h2><p class="sub">Apaga todos os lançamentos para recomeçar: viagens, fotos das folhas, vales, faltas, folgas, comissões, receitas e descontos, fluxo de caixa (lançamentos e saldos), gastos de manutenção e documentos anexados. <b>Ficam:</b> motoristas (nome, salário fixo, benefícios, admissão/desligamento e documentos deles), caminhões e os dias de pagamento do caixa. Antes de apagar, o sistema baixa uma cópia de segurança.</p>
+    <button class="btn danger" onclick="formLimpar()">${I.lixo}Apagar lançamentos e começar do zero</button></div>`;
 function baixarBackup(){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify({gerado:new Date().toISOString(), cadastros:cad, viagens, manutencoes:gastos},null,1)],{type:'application/json'})); a.download='rodow-caminhoes-'+hoje()+'.json'; a.click(); toast('Cópia baixada'); }
+function formLimpar(){
+  const n={viagens:viagens.length, lancs:cad.lancs.length, caixa:cad.caixa.lancs.length, gastos:gastos.length};
+  abrirModal({titulo:'Apagar todos os lançamentos?', ok:'Apagar tudo', perigo:true,
+    desc:`Vão ser apagados ${n.viagens} viagem(ns), ${n.lancs} vale(s)/falta(s)/folga(s)/comissão(ões)/avulso(s), ${n.caixa} lançamento(s) do fluxo de caixa, os saldos iniciais, ${n.gastos} gasto(s) de manutenção, as fotos das folhas e os documentos anexados a eles. Ficam os motoristas (com salário fixo, benefícios e documentos) e os caminhões. <b>Não dá para desfazer</b> pelo sistema; uma cópia de segurança vai ser baixada antes.`,
+    corpo:`<label class="field"><span>Para confirmar, digite APAGAR</span><input class="inp" name="conf" autocomplete="off"></label>`,
+    aoConfirmar:async f=>{
+      if(f.conf.value.trim().toUpperCase()!=='APAGAR'){ toast('Digite APAGAR para confirmar.',true); return false; }
+      try{ await limparTudo(); }catch(e){ console.error(e); erroSalvar(e); return false; }
+    }});
+}
+async function limparTudo(){
+  baixarBackup();
+  statusSync('Apagando…');
+  // documentos que continuam: os do cadastro dos motoristas
+  const manter=new Set(cad.motoristas.flatMap(m=>(m.anexos||[]).map(a=>a.id)));
+  const apagarColecao=async(nome, ficar)=>{
+    const snap=await db.collection(nome).get(); let b=db.batch(), n=0, tot=0;
+    for(const d of snap.docs){ if(ficar&&ficar(d.id)) continue; b.delete(db.collection(nome).doc(d.id)); n++; tot++; if(n>=400){ await b.commit(); b=db.batch(); n=0; } }
+    if(n) await b.commit(); return tot;
+  };
+  // salva o cadastro limpo primeiro
+  cad.lancs=[]; cad.caixa={saldos:{}, lancs:[], config:cad.caixa.config||{}};
+  clearTimeout(salvando); pendente=true; await cadRef.set(JSON.parse(JSON.stringify(cad))); pendente=false;
+  const t={};
+  t.viagens=await apagarColecao('viagens');
+  t.gastos=await apagarColecao('manutencoes');
+  t.fotos=await apagarColecao('fotos');
+  t.anexos=await apagarColecao('anexos', id=>manter.has(id));
+  await apagarColecao('anexos_partes', id=>manter.has(id.replace(/_\d+$/,'')));
+  statusSync('Tudo salvo'); V.mes=mesAtual(); pag='inicio'; history.replaceState(null,'','#inicio');
+  toast(`Pronto: ${t.viagens} viagem(ns), ${t.gastos} gasto(s) e os lançamentos foram apagados`);
+}
 async function trocarSenha(){ try{ await auth.sendPasswordResetEmail(auth.currentUser.email); toast('Enviamos o link para '+auth.currentUser.email); }catch(e){ toast('Não foi possível enviar o e-mail.',true); } }
 
 /* ============================ LOGIN ============================ */
