@@ -102,7 +102,7 @@ tr:last-child td{border-bottom:0}
 tfoot td{border-top:2px solid var(--line2);font-weight:700}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 td.act{text-align:right;white-space:nowrap}
-.nc{display:none}
+.nc{display:none} .mob{display:none}
 .pessoa{display:flex;align-items:center;gap:10px;font-weight:600}
 .av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0;color:#fff}
 .placa{display:inline-block;font-weight:700;font-size:13px;letter-spacing:.04em;border:1.5px solid var(--ink);border-radius:5px;padding:0 6px;background:#fff;white-space:nowrap}
@@ -225,7 +225,7 @@ td.act{text-align:right;white-space:nowrap}
   .fg,.fg3{grid-template-columns:1fr 1fr}
   td.hide-m,th.hide-m,.hide-m{display:none}
   td.act .icon-btn{padding:4px}
-  .nf{display:none} .nc{display:inline} td.nc{display:table-cell}
+  .nf{display:none} .nc{display:inline} td.nc{display:table-cell} .mob{display:block}
   #modal{padding:16px 8px}
   .benrow{grid-template-columns:1fr 1fr}
   .benrow .icon-btn{grid-column:1/-1;justify-self:end}
@@ -363,6 +363,7 @@ const I = {
   fechamento:'<svg class="i" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
   manutencao:'<svg class="i" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>',
   caminhoes:'<svg class="i" viewBox="0 0 24 24"><path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+  caixa:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg>',
   conta:'<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>',
   mais:'<svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
   esq:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
@@ -413,13 +414,14 @@ function ativosNoMes(ym){
 function normalizar(s){
   s=s||{};
   s.motoristas=s.motoristas||[]; s.caminhoes=s.caminhoes||[]; s.lancs=s.lancs||[];
+  s.caixa=s.caixa||{}; s.caixa.saldos=s.caixa.saldos||{}; s.caixa.lancs=s.caixa.lancs||[];
   return s;
 }
 function cadastroInicial(){
   return {
     motoristas: MOTORISTAS_INICIAIS.map(n=>({id:uid(), nome:n, fixo:0, ativo:true})),
     caminhoes: CAMINHOES_INICIAIS.map(([p,t])=>({id:uid(), placa:p, tipo:t, modelo:'', ativo:true})),
-    lancs: []
+    lancs: [], caixa:{saldos:{}, lancs:[]}
   };
 }
 function statusSync(t){ const el=$('sync'); if(el) el.textContent=t; }
@@ -473,12 +475,13 @@ const PAGS = [
   {id:'viagens', nome:'Viagens', i:'viagens'},
   {id:'motoristas', nome:'Vales, faltas e folgas', i:'motoristas'},
   {id:'fechamento', nome:'Fechamento do mês', i:'fechamento'},
+  {id:'caixa', nome:'Fluxo de caixa', i:'caixa'},
   {id:'manutencao', nome:'Manutenção', i:'manutencao'},
   {g:'Cadastros'},
   {id:'cadastros', nome:'Motoristas e caminhões', i:'caminhoes'},
   {id:'conta', nome:'Minha conta', i:'conta'}
 ];
-const MAIS_IDS=['motoristas','manutencao','cadastros','conta'];
+const MAIS_IDS=['caixa','motoristas','manutencao','cadastros','conta'];
 let pag='inicio';
 const V = { mes: mesAtual(), fMot:'', fPlaca:'', lMot:'', gPlaca:'', abertos:{} };
 function ir(p, opts){ pag=p; if(opts) Object.assign(V,opts); fecharMais(); history.replaceState(null,'','#'+p); window.scrollTo(0,0); render(); }
@@ -944,6 +947,91 @@ function pdfHolerite(ids){
 }
 
 /* ============================ MANUTENÇÃO ============================ */
+/* ============================ FLUXO DE CAIXA ============================
+   Saldo inicial do mês + entradas − saídas, em ordem de data,
+   com o saldo dia a dia para ver quando o dinheiro fica curto.
+   ======================================================================= */
+function caixaMes(ym){
+  const C=cad.caixa, ini=C.saldos[ym];
+  const ls=C.lancs.filter(l=>noMes(l.data,ym)).sort((a,b)=>a.data.localeCompare(b.data)||(a.tipo==='entrada'?-1:1)||(a.criado||0)-(b.criado||0));
+  let saldo=num(ini), menor=null;
+  const linhas=ls.map(l=>{ saldo=r2(saldo+(l.tipo==='entrada'?1:-1)*num(l.valor)); if(menor===null||saldo<menor.saldo) menor={saldo,data:l.data}; return {...l, saldo}; });
+  const ent=r2(soma(ls.filter(l=>l.tipo==='entrada'),l=>l.valor)), sai=r2(soma(ls.filter(l=>l.tipo!=='entrada'),l=>l.valor));
+  const aPagar=r2(soma(ls.filter(l=>l.tipo!=='entrada'&&!l.pago),l=>l.valor));
+  return {temInicio:ini!==undefined&&ini!==null&&ini!=='', inicio:num(ini), linhas, ent, sai, aPagar, fim:r2(num(ini)+ent-sai), menor};
+}
+R.caixa = () => {
+  const ym=V.mes, c=caixaMes(ym), ant=somaMes(ym,-1), cAnt=caixaMes(ant);
+  const podePuxar=!c.temInicio && (cAnt.temInicio||cAnt.linhas.length);
+  const falta=c.menor && c.menor.saldo<0;
+  return `
+  <div class="head"><div><h1>Fluxo de caixa</h1><p>Quanto tinha no começo do mês, o que vai entrar e o que vai sair em cada dia. O saldo mostra quanto sobra depois de cada lançamento.</p></div>
+    <div class="tools">${seletorMes()}<button class="btn" onclick="formCaixa()">${I.lancar}Novo lançamento</button></div></div>
+  ${!c.temInicio?`<div class="aviso info"><div><b>Informe o saldo do começo do mês</b>Quanto tinha na conta no dia 1º de ${mesNome(ym)}. <button class="link" onclick="formSaldo()">Informar saldo inicial</button>${podePuxar?` · <button class="link" onclick="usarSaldoAnterior()">Usar o saldo final de ${MESES[+ant.slice(5)-1]} (${brl(cAnt.fim)})</button>`:''}</div></div>`:''}
+  ${falta?`<div class="aviso" style="background:var(--winebg);color:#6d1d27"><div><b>Vai faltar dinheiro em ${br(c.menor.data)}</b>O saldo chega a ${brl(c.menor.saldo)}. É preciso ter mais ${brl(-c.menor.saldo)} na conta até esse dia.</div></div>`:''}
+  <div class="faixa">
+    <div style="cursor:pointer" onclick="formSaldo()"><div class="l">Começou o mês com ${I.editar}</div><div class="v money">${c.temInicio?brl(c.inicio):'<span class="muted">—</span>'}</div><div class="s">toque para mudar</div></div>
+    <div><div class="l">Entradas</div><div class="v money pos">${brl(c.ent)}</div></div>
+    <div><div class="l">Saídas</div><div class="v money neg">${brl(c.sai)}</div><div class="s">${brl(r2(c.sai-c.aPagar))} pago · ${brl(c.aPagar)} a pagar</div></div>
+    <div><div class="l">Termina o mês com</div><div class="v money ${c.fim<0?'neg':''}">${brl(c.fim)}</div>${c.menor?`<div class="s">menor saldo: ${brl(c.menor.saldo)} em ${brCurto(c.menor.data)}</div>`:''}</div>
+  </div>
+  <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
+    <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="formCaixa('${l.id}')">${esc(l.desc)}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+      <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
+      <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
+      <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
+      <td class="act hide-m"><button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button></td></tr>`).join('')}
+    </tbody></table></div><div class="ajuda mob">Toque na descrição para editar, marcar como pago ou apagar.</div>`
+    :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
+  </div>
+  ${c.linhas.length?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
+};
+function formSaldo(){
+  const c=caixaMes(V.mes);
+  abrirModal({titulo:'Saldo do começo do mês', desc:`Quanto tinha na conta no dia 1º de ${mesNome(V.mes)}.`,
+    corpo:`<label class="field"><span>Saldo inicial (R$)</span><input class="inp num" name="v" inputmode="decimal" value="${c.temInicio?fmtInp(c.inicio)||'0,00':''}" required></label><div class="ajuda">Se a conta estava no negativo, coloque o sinal de menos. Ex.: -1.500,00</div>`,
+    aoConfirmar:f=>{ const t=f.v.value.trim(); if(!t){ toast('Informe o valor.',true); return false; } cad.caixa.saldos[V.mes]=num(t); salvar(); toast('Saldo inicial salvo'); }});
+}
+function usarSaldoAnterior(){ cad.caixa.saldos[V.mes]=caixaMes(somaMes(V.mes,-1)).fim; salvar(); toast('Saldo inicial salvo'); render(); }
+function formCaixa(id){
+  const l=id?cad.caixa.lancs.find(x=>x.id===id):{tipo:'saida', data:noMes(hoje(),V.mes)?hoje():V.mes+'-01', desc:'', valor:0, pago:V.mes<mesAtual()};
+  if(!l) return;
+  abrirModal({titulo:id?'Editar lançamento':'Novo lançamento no caixa',
+    corpo:`<input type="hidden" name="tipo" value="${l.tipo}">
+    <div class="seg" id="segCx" style="margin-top:8px"><button type="button" class="${l.tipo!=='entrada'?'on':''}" onclick="this.form.tipo.value='saida';[...this.parentNode.children].forEach(b=>b.classList.toggle('on',b===this))">Vou pagar</button><button type="button" class="${l.tipo==='entrada'?'on':''}" onclick="this.form.tipo.value='entrada';[...this.parentNode.children].forEach(b=>b.classList.toggle('on',b===this))">Vou receber</button></div>
+    <div class="fg">
+      <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc)}" placeholder="Ex.: parcela do caminhão, salários, frete da Calp" required></label>
+      <label class="field"><span>Dia</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required ${id?'':`onchange="this.form.pago.checked=this.value.slice(0,7)<mesAtual()"`}></label>
+      <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}" required></label>
+    </div>
+    <label class="toggle"><input type="checkbox" name="pago" ${l.pago?'checked':''}> Já foi pago / recebido</label>
+    <div class="ajuda">Pode lançar contas de meses passados: o lançamento vai para o mês da data escolhida.</div>`,
+    extra:id?`<button type="button" class="btn danger" style="margin-right:auto" onclick="apagarCaixa('${id}')">${I.lixo}Apagar</button>`:'',
+    aoConfirmar:f=>{
+      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked};
+      if(!o.desc||!o.data){ toast('Preencha a descrição e o dia.',true); return false; }
+      if(o.valor<=0){ toast('Informe o valor.',true); return false; }
+      if(id) Object.assign(l,o); else cad.caixa.lancs.push({id:uid(), criado:Date.now(), ...o});
+      salvar();
+      if(!noMes(o.data,V.mes)){ V.mes=o.data.slice(0,7); toast('Lançado em '+mesNome(V.mes)); }
+      else toast(id?'Lançamento atualizado':'Lançamento salvo');
+    }});
+}
+function marcarPago(id,on){ const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return; l.pago=on; salvar(); render(); }
+function apagarCaixa(id){
+  const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return;
+  confirmar('Apagar este lançamento?', `${esc(l.desc)} · ${brl(l.valor)} em ${br(l.data)}.`, 'Apagar', ()=>{ cad.caixa.lancs=cad.caixa.lancs.filter(x=>x.id!==id); salvar(); toast('Lançamento apagado'); });
+}
+function copiarCaixa(){
+  const de=V.mes, para=somaMes(de,1), ls=cad.caixa.lancs.filter(l=>noMes(l.data,de));
+  const [y,m]=para.split('-').map(Number), ult=new Date(y,m,0).getDate();
+  confirmar(`Copiar ${ls.length} lançamento(s) para ${mesNome(para)}?`, 'Mesma descrição, mesmo dia e mesmo valor, ainda não pagos. Depois é só ajustar o que mudou.', 'Copiar', ()=>{
+    ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
+    salvar(); V.mes=para; toast(`${ls.length} lançamento(s) copiados para ${mesNome(para)}`);
+  });
+}
+
 R.manutencao = () => {
   const ym=V.mes, gm=gastos.filter(g=>noMes(g.data,ym));
   const lista=(V.gPlaca?gastos.filter(g=>normPlaca(g.placa)===normPlaca(V.gPlaca)):gm).sort((a,b)=>b.data.localeCompare(a.data));
