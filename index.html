@@ -334,6 +334,12 @@ const BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const brl = v => BRL.format(Number(v)||0);
 const inteiro = v => (Number(v)||0).toLocaleString('pt-BR');
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Momento em que o registro foi lançado: campo "criado" ou, nos antigos, o começo do id (gerado a partir do relógio). */
+function tempo(o){
+  if(!o) return 0; if(o.criado) return o.criado;
+  const ref=o.lancId||o.lancOrigem||o.id||''; const t=parseInt(String(ref).slice(0,8),36);
+  return t>1.6e12&&t<2.2e12 ? t : 0;
+}
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const soma = (a,f) => a.reduce((t,x)=>t+(Number(f(x))||0),0);
 const r2 = v => Math.round((Number(v)||0)*100)/100;
@@ -795,7 +801,7 @@ async function gravarImport(f){
 
 /* ============================ VALES, FALTAS E FOLGAS ============================ */
 R.motoristas = () => {
-  const ym=V.mes; let ls=cad.lancs.filter(l=>noMes(l.data,ym)&&(!V.lMot||l.motoristaId===V.lMot)).sort((a,b)=>a.data.localeCompare(b.data));
+  const ym=V.mes; let ls=cad.lancs.filter(l=>noMes(l.data,ym)&&(!V.lMot||l.motoristaId===V.lMot)).sort((a,b)=>a.data.localeCompare(b.data)||tempo(a)-tempo(b));
   const t=k=>soma(ls.filter(l=>l.tipo===k),l=>l.valor);
   return `
   <div class="head"><div><h1>Vales, faltas e folgas</h1><p>Lance cada vale, falta e folga no dia em que aconteceu. Receitas e descontos avulsos aparecem no holerite com a descrição que você digitar.</p></div>
@@ -839,7 +845,7 @@ function formLanc(id, tipoPadrao, motPadrao, descPadrao){
       if(!T.semValor && o.valor<=0){ toast('Informe o valor.',true); return false; }
       if((tipo==='receita'||tipo==='desconto') && !o.desc){ toast('Escreva a descrição, ela aparece no holerite.',true); return false; }
       try{ o.anexos=await salvarAnexos('lanc'); }catch(e){ return false; }
-      if(id) Object.assign(cad.lancs.find(x=>x.id===id)||l,o); else cad.lancs.push({id:uid(),...o});
+      if(id) Object.assign(cad.lancs.find(x=>x.id===id)||l,o); else cad.lancs.push({id:uid(), criado:Date.now(), ...o});
       salvar(); toast(com?`Comissão de ${mesNome(o.data.slice(0,7))} lançada · paga em ${br(o.pagamento)}`:T.nome+(id?' atualizado':' lançado'));
     }});
   tipoLanc(l.tipo, true);
@@ -1033,15 +1039,15 @@ function caixaAutoTodos(ym){
     const lref=l.data.slice(0,7), k=l.motoristaId+'|'+lref; cache[k]=cache[k]||divisaoPagamento(l.motoristaId,lref);
     const v=cache[k].com[l.id]; if(!v) return;
     const key='com:'+l.id, desc=l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' · '+l.desc:'';
-    out.push({id:key, auto:'comissao', ref:lref, lancId:l.id, motoristaId:l.motoristaId, tipo:'saida', data:pagamentoComissao(l), desc:`Comissão ${mot(l.motoristaId).nome} (${refTxt(lref)})${desc}`, valor:v, pago:!!pagos[key]});
+    out.push({id:key, auto:'comissao', ref:lref, lancId:l.id, criado:tempo(l), motoristaId:l.motoristaId, tipo:'saida', data:pagamentoComissao(l), desc:`Comissão ${mot(l.motoristaId).nome} (${refTxt(lref)})${desc}`, valor:v, pago:!!pagos[key]});
   });
   cad.lancs.filter(l=>l.tipo==='vale'&&noMes(l.data,ym)).forEach(l=>{ const key='vale:'+l.id;
-    out.push({id:key, auto:'vale', ref:ym, motoristaId:l.motoristaId, tipo:'saida', data:l.data, desc:`Vale ${mot(l.motoristaId).nome}${l.desc?' · '+l.desc:''}`, valor:num(l.valor), pago:pagos[key]!==undefined?!!pagos[key]:l.data<=hoje()}); });
+    out.push({id:key, auto:'vale', ref:ym, criado:tempo(l), motoristaId:l.motoristaId, tipo:'saida', data:l.data, desc:`Vale ${mot(l.motoristaId).nome}${l.desc?' · '+l.desc:''}`, valor:num(l.valor), pago:pagos[key]!==undefined?!!pagos[key]:l.data<=hoje()}); });
   return out;
 }
 function caixaMes(ym){
   const C=cad.caixa, ini=C.saldos[ym];
-  const ls=[...C.lancs.filter(l=>noMes(l.data,ym)), ...caixaAuto(ym)].sort((a,b)=>a.data.localeCompare(b.data)||((a.tipo==='entrada'?0:1)-(b.tipo==='entrada'?0:1))||(a.criado||0)-(b.criado||0));
+  const ls=[...C.lancs.filter(l=>noMes(l.data,ym)), ...caixaAuto(ym)].sort((a,b)=>a.data.localeCompare(b.data)||tempo(a)-tempo(b));
   let saldo=num(ini), menor=null;
   const linhas=ls.map(l=>{ saldo=r2(saldo+(l.tipo==='entrada'?1:-1)*num(l.valor)); if(menor===null||saldo<menor.saldo) menor={saldo,data:l.data}; return {...l, saldo}; });
   const ent=r2(soma(ls.filter(l=>l.tipo==='entrada'),l=>l.valor)), sai=r2(soma(ls.filter(l=>l.tipo!=='entrada'),l=>l.valor));
