@@ -1077,7 +1077,7 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.ajustado?` <span class="tag t-warn" title="Holerite: ${brl(l.valorHolerite)}">ajustado no caixa</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}${l.obsAjuste?`<div class="muted" style="font-size:12px">${esc(l.obsAjuste)}</div>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.vinc?(l.vinc.tipo==='caminhao'?` ${placaTag(l.vinc.placa)}`:` <span class="tag t-acc">${esc(l.vinc.texto)}</span>`):''}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.ajustado?` <span class="tag t-warn" title="Holerite: ${brl(l.valorHolerite)}">ajustado no caixa</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}${l.obsAjuste?`<div class="muted" style="font-size:12px">${esc(l.obsAjuste)}</div>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
@@ -1086,6 +1086,10 @@ R.caixa = () => {
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
   ${(()=>{ const o=cad.caixa.ocultos||{}, n=caixaAuto(ym,true).filter(l=>o[l.id]).length; return n?`<div class="ajuda" style="margin-top:10px">${n} lançamento(s) automático(s) tirado(s) deste mês. <button class="link" onclick="trazerAutos()">Trazer de volta</button></div>`:''; })()}
+  ${(()=>{ const g={}; c.linhas.filter(l=>l.vinc).forEach(l=>{ const k=l.vinc.tipo==='caminhao'?'C:'+fmtPlaca(l.vinc.placa):'O:'+l.vinc.texto.trim().toLowerCase(); g[k]=g[k]||{nome:l.vinc.tipo==='caminhao'?placaTag(l.vinc.placa):esc(l.vinc.texto), ent:0, sai:0}; g[k][l.tipo==='entrada'?'ent':'sai']+=num(l.valor); });
+    const ks=Object.keys(g).sort(); if(!ks.length) return '';
+    return `<div class="panel"><h2>Por caminhão ou referência</h2><p class="sub">Só os lançamentos do mês com “Referente a” preenchido.</p><div class="tw"><table><thead><tr><th>Referente a</th><th class="n">Entradas</th><th class="n">Saídas</th><th class="n">Resultado</th></tr></thead><tbody>
+      ${ks.map(k=>{ const x=g[k], res=r2(x.ent-x.sai); return `<tr><td>${x.nome}</td><td class="n money pos">${x.ent?brl(x.ent):'—'}</td><td class="n money neg">${x.sai?brl(x.sai):'—'}</td><td class="n money ${res<0?'neg':''}"><b>${brl(res)}</b></td></tr>`; }).join('')}</tbody></table></div></div>`; })()}
   <div class="ajuda" style="margin-top:10px">Motoristas entram sozinhos: salário base no dia ${cfgCaixa().dia} e viagens extras no dia ${cfgCaixa().diaExtras} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}; cada comissão na data de pagamento escolhida nela; vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dias</button></div>
   ${C_manual(ym)?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
 };
@@ -1107,14 +1111,20 @@ function formCaixa(id){
       <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc)}" placeholder="Ex.: parcela do caminhão, salários, frete da Calp" required></label>
       <label class="field"><span>Dia</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required ${id?'':`onchange="this.form.pago.checked=this.value.slice(0,7)<mesAtual()"`}></label>
       <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}" required></label>
-      <label class="field full"><span>Referente ao mês (opcional)</span><input class="inp" type="month" name="ref" value="${esc(l.ref||'')}"><span class="ajuda" style="display:block;font-weight:400">Ex.: pagamento feito em novembro referente ao trabalho de outubro.</span></label>
+      <label class="field"><span>Referente a (opcional)</span><select class="inp" name="vinc" onchange="this.form.vincTxt.parentNode.style.display=this.value==='outro'?'':'none'">
+        <option value="">—</option>${optsPlaca(l.vinc&&l.vinc.tipo==='caminhao'?l.vinc.placa:'').replace('<optgroup label="Ração">','<optgroup label="Caminhão · Ração">').replace('<optgroup label="Leite">','<optgroup label="Caminhão · Leite">')}
+        <option value="outro" ${l.vinc&&l.vinc.tipo==='outro'?'selected':''}>Outra coisa…</option></select></label>
+      <label class="field" style="${l.vinc&&l.vinc.tipo==='outro'?'':'display:none'}"><span>Qual?</span><input class="inp" name="vincTxt" value="${esc(l.vinc&&l.vinc.tipo==='outro'?l.vinc.texto:'')}" placeholder="Ex.: fazenda, cooperativa, aluguel"></label>
+      <label class="field full"><span>Mês de referência (opcional)</span><input class="inp" type="month" name="ref" value="${esc(l.ref||'')}"><span class="ajuda" style="display:block;font-weight:400">Ex.: pagamento feito em novembro referente ao trabalho de outubro.</span></label>
     </div>
     <label class="toggle"><input type="checkbox" name="pago" ${l.pago?'checked':''}> Já foi pago / recebido</label>
     <div class="ajuda">Pode lançar contas de meses passados: o lançamento vai para o mês da data escolhida.</div>
     ${campoAnexos(l.anexos)}`,
     extra:id?`<button type="button" class="btn danger" style="margin-right:auto" onclick="apagarCaixa('${id}')">${I.lixo}Apagar</button>`:'',
     aoConfirmar:async f=>{
-      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||''};
+      const vv=f.vinc.value, vinc=!vv?null:vv==='outro'?{tipo:'outro', texto:f.vincTxt.value.trim()}:{tipo:'caminhao', placa:fmtPlaca(vv)};
+      if(vinc&&vinc.tipo==='outro'&&!vinc.texto){ toast('Escreva a que se refere.',true); return false; }
+      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||'', vinc};
       if(!o.desc||!o.data){ toast('Preencha a descrição e o dia.',true); return false; }
       if(o.valor<=0){ toast('Informe o valor.',true); return false; }
       try{ o.anexos=await salvarAnexos('caixa'); }catch(e){ return false; }
@@ -1188,7 +1198,7 @@ function copiarCaixa(){
   const de=V.mes, para=somaMes(de,1), ls=cad.caixa.lancs.filter(l=>noMes(l.data,de));
   const [y,m]=para.split('-').map(Number), ult=new Date(y,m,0).getDate();
   confirmar(`Copiar ${ls.length} lançamento(s) para ${mesNome(para)}?`, 'Mesma descrição, mesmo dia e mesmo valor, ainda não pagos. Depois é só ajustar o que mudou.', 'Copiar', ()=>{
-    ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
+    ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, vinc:l.vinc||null, data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
     salvar(); V.mes=para; toast(`${ls.length} lançamento(s) copiados para ${mesNome(para)}`);
   });
 }
