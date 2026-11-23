@@ -413,7 +413,7 @@ function calcMes(motId, ym){
   const mensais=(m.beneficios||[]).filter(b=>p.dentro && num(b.valor)>0 && (!b.desde||b.desde<=ym) && (!b.ate||b.ate>=ym)).map(b=>({desc:b.desc, valor:num(b.valor), tipo:b.tipo, mensal:true}));
   // Comissão: tipo próprio; receita avulsa com "comissão" na descrição também conta como comissão
   const ehCom=l=>/comiss/i.test(l.desc||'');
-  r.comissoes=[...L('comissao'), ...L('receita').filter(ehCom)].sort((a,b)=>a.data.localeCompare(b.data));
+  r.comissoes=[...L('comissao'), ...L('receita').filter(ehCom)].sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   r.totComissoes=r2(soma(r.comissoes,l=>l.valor));
   r.receitas=[...mensais.filter(b=>b.tipo!=='desconto'), ...L('receita').filter(l=>!ehCom(l))];
   r.descontos=[...mensais.filter(b=>b.tipo==='desconto'), ...L('desconto')];
@@ -529,7 +529,7 @@ function abrirModal({titulo, desc='', corpo='', ok='Salvar', cancelar='Cancelar'
   $('mbox').innerHTML=`<h2>${titulo}</h2>${desc?`<p class="desc">${desc}</p>`:''}<form id="mform" onsubmit="event.preventDefault();confirmarModal()">${corpo}<div class="acoes">${extra}${extraFim}${cancelar?`<button type="button" class="btn sec" onclick="fecharModal()">${cancelar}</button>`:''}${ok?`<button class="btn ${perigo?'danger':''}" id="mok">${ok}</button>`:''}</div></form>`;
   $('modal').classList.add('on');
   if($('anxLista')) desenharAnexos(); else ANX=null;
-  setTimeout(()=>{ const f=$('mform')&&$('mform').querySelector('input:not([type=checkbox]):not([type=file]),select,textarea'); if(f && window.innerWidth>900) f.focus(); },30);
+  setTimeout(()=>{ const f=$('mform')&&$('mform').querySelector('input:not([type=checkbox]):not([type=file]),select,textarea'); if(f && window.innerWidth>900 && !$('mbox').contains(document.activeElement)) f.focus(); },30);
 }
 async function confirmarModal(){ if(!MODAL) return; const b=$('mok'); if(b) b.disabled=true; let r; try{ r=await MODAL.aoConfirmar?.($('mform')); }catch(e){ r=false; } if(b) b.disabled=false; if(r===false) return; fecharModal(); }
 function fecharModal(){ $('modal').classList.remove('on'); MODAL=null; render(); }
@@ -808,7 +808,7 @@ R.motoristas = () => {
     <div><div class="l">Comissões e avulsos</div><div class="v money" style="font-size:20px">+${brl(t('comissao')+t('receita'))}<br>−${brl(t('desconto'))}</div></div>
   </div>
   <div class="panel">${ls.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Motorista</th><th>Tipo</th><th class="hide-m">Descrição</th><th class="n">Valor</th><th></th></tr></thead><tbody>
-    ${ls.map(l=>{ const m=mot(l.motoristaId), T=TIPOS_LANC[l.tipo]||{nome:l.tipo,tag:'t-mut'}; return `<tr><td>${brCurto(l.data)}</td><td><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>
+    ${ls.map(l=>{ const m=mot(l.motoristaId), T=TIPOS_LANC[l.tipo]||{nome:l.tipo,tag:'t-mut'}; return `<tr><td>${ehComissao(l)?`ref. ${refTxt(l.data.slice(0,7))}<div class="muted" style="font-size:12px">paga ${brCurto(pagamentoComissao(l))}</div>`:brCurto(l.data)}</td><td><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>
       <td><span class="tag ${T.tag}">${T.nome}</span></td><td class="hide-m">${esc(l.desc||'')}${clipBtn(l.anexos)}</td>
       <td class="n money ${T.semValor?'':T.desconto?'neg':'pos'}">${T.semValor?'<span class="muted">—</span>':(T.desconto?'−':'+')+brl(l.valor)}</td>
       <td class="act"><button class="icon-btn" title="Editar" onclick="formLanc('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarLanc('${l.id}')">${I.lixo}</button></td></tr>`; }).join('')}
@@ -823,19 +823,24 @@ function formLanc(id, tipoPadrao, motPadrao, descPadrao){
     <div class="seg" id="segTipo" style="margin-top:8px">${Object.entries(TIPOS_LANC).map(([k,t])=>`<button type="button" class="${l.tipo===k?'on':''}" onclick="tipoLanc('${k}')">${t.nome.split(' ')[0]}</button>`).join('')}</div>
     <div class="fg">
       <label class="field"><span>Motorista</span><select class="inp" name="mot" required onchange="sugerirFalta()"><option value="">Escolha…</option>${optsMot(l.motoristaId)}</select></label>
-      <label class="field"><span>Data</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required></label>
+      <label class="field" id="lcData"><span>Data</span><input class="inp" type="date" name="data" value="${esc(l.data)}"></label>
+      <label class="field" id="lcRef"><span>Referente ao mês (holerite)</span><input class="inp" type="month" name="ref" value="${esc((l.data||'').slice(0,7))}" onchange="sugerirPagamento(true)"></label>
+      <label class="field" id="lcPag"><span>Data do pagamento</span><input class="inp" type="date" name="pag" value="${esc(l.pagamento||'')}" oninput="this.dataset.mexeu=1"></label>
       <label class="field" id="lcValor"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}"></label>
       <label class="field" id="lcDesc"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc||'')}" list="sugDesc" autocomplete="off"></label>
     </div><div class="ajuda" id="lcAjuda"></div>${datalistSug()}${campoAnexos(l.anexos)}`,
     aoConfirmar:async f=>{
       const tipo=f.tipo.value, T=TIPOS_LANC[tipo];
-      const o={...l, tipo, motoristaId:f.mot.value, data:f.data.value, valor:T.semValor?0:num(f.valor.value), desc:f.desc.value.trim()};
-      if(!o.motoristaId||!o.data){ toast('Escolha o motorista e a data.',true); return false; }
+      const com=tipo==='comissao';
+      const o={...l, tipo, motoristaId:f.mot.value, data:com?(f.ref.value?f.ref.value+'-01':''):f.data.value, valor:T.semValor?0:num(f.valor.value), desc:f.desc.value.trim()};
+      if(com) o.pagamento=f.pag.value; else delete o.pagamento;
+      if(!o.motoristaId||!o.data){ toast(com?'Escolha o motorista e o mês de referência.':'Escolha o motorista e a data.',true); return false; }
+      if(com && !o.pagamento){ toast('Informe a data do pagamento da comissão.',true); return false; }
       if(!T.semValor && o.valor<=0){ toast('Informe o valor.',true); return false; }
       if((tipo==='receita'||tipo==='desconto') && !o.desc){ toast('Escreva a descrição, ela aparece no holerite.',true); return false; }
       try{ o.anexos=await salvarAnexos('lanc'); }catch(e){ return false; }
       if(id) Object.assign(cad.lancs.find(x=>x.id===id)||l,o); else cad.lancs.push({id:uid(),...o});
-      salvar(); toast(T.nome+(id?' atualizado':' lançado'));
+      salvar(); toast(com?`Comissão de ${mesNome(o.data.slice(0,7))} lançada · paga em ${br(o.pagamento)}`:T.nome+(id?' atualizado':' lançado'));
     }});
   tipoLanc(l.tipo, true);
 }
@@ -843,9 +848,17 @@ function tipoLanc(t, inicio){
   const f=$('mform'); f.tipo.value=t; const T=TIPOS_LANC[t];
   [...$('segTipo').children].forEach(b=>b.classList.toggle('on', b.textContent===T.nome.split(' ')[0]));
   $('lcValor').style.display=T.semValor?'none':'';
+  const com=t==='comissao'; $('lcData').style.display=com?'none':''; $('lcRef').style.display=com?'':'none'; $('lcPag').style.display=com?'':'none';
+  if(com){ if(!f.ref.value) f.ref.value=(f.data.value||V.mes).slice(0,7); sugerirPagamento(false); }
+  else if(!f.data.value && f.ref.value) f.data.value=f.ref.value+'-01';
   $('lcDesc').querySelector('span').textContent=(t==='receita'||t==='desconto')?'Descrição (aparece no holerite)':'Observação (opcional)';
-  $('lcAjuda').textContent={vale:'Dinheiro adiantado ao motorista. Desconta do salário no fechamento do mês.',falta:'Informe quanto descontar por esta falta. Sugestão: salário fixo ÷ 30.',folga:'Folga só fica registrada. Não desconta.',comissao:'Comissão do mês. No fluxo de caixa ela sai no dia das extras/comissão (padrão: dia 15 do mês seguinte), separada do salário base.',receita:'Soma no holerite só neste mês, ex.: vale transporte, vale refeição, salário família. Para repetir todo mês, cadastre no motorista.',desconto:'Desconta no holerite só neste mês, ex.: desconto do vale transporte, multa. Para repetir todo mês, cadastre no motorista.'}[t];
+  $('lcAjuda').textContent={vale:'Dinheiro adiantado ao motorista. Desconta do salário no fechamento do mês.',falta:'Informe quanto descontar por esta falta. Sugestão: salário fixo ÷ 30.',folga:'Folga só fica registrada. Não desconta.',comissao:'Entra no holerite do mês de referência. No fluxo de caixa ela sai sozinha na data do pagamento, separada do salário e das viagens extras.',receita:'Soma no holerite só neste mês, ex.: vale transporte, vale refeição, salário família. Para repetir todo mês, cadastre no motorista.',desconto:'Desconta no holerite só neste mês, ex.: desconto do vale transporte, multa. Para repetir todo mês, cadastre no motorista.'}[t];
   if(!inicio || t==='falta') sugerirFalta();
+}
+function sugerirPagamento(forcar){
+  const f=$('mform'); if(!f||!f.ref.value) return;
+  if(f.pag.value && !forcar) return; if(forcar && f.pag.dataset.mexeu) return;
+  f.pag.value=pagamentoComissao({data:f.ref.value+'-01'});
 }
 function sugerirFalta(){
   const f=$('mform'); if(!f||f.tipo.value!=='falta'||num(f.valor.value)) return;
@@ -881,7 +894,7 @@ function cartaoHolerite(r){
     <div class="corpo"><div>
       <div class="bloco-t">A receber</div>
       ${ln(r.p.parcial?`Salário proporcional <span class="muted">(${r.p.dias} dias${r.m.desligamento&&noMes(r.m.desligamento,V.mes)?', desligado em '+brCurto(r.m.desligamento):''}${r.m.admissao&&noMes(r.m.admissao,V.mes)?', admitido em '+brCurto(r.m.admissao):''})</span>`:'Salário fixo',brl(r.fixo))}
-      ${r.comissoes.map(l=>ln(`Comissão${l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' · '+esc(l.desc):''} <span class="muted">(${brCurto(l.data)})</span>`,brl(l.valor),'pos')).join('')}
+      ${r.comissoes.map(l=>ln(`Comissão${l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' · '+esc(l.desc):''} <span class="muted">(paga em ${brCurto(pagamentoComissao(l))})</span>`,brl(l.valor),'pos')).join('')}
       ${r.extras.map(v=>ln(`Viagem extra ${brCurto(v.data)} · ${esc(fmtPlaca(v.placa))}${v.rota?' · '+esc(v.rota):''}`,brl(v.valorExtra),'pos')).join('')}
       ${r.receitas.map(l=>ln(esc(l.desc)+` <span class="muted">(${quando(l)})</span>`,brl(l.valor),'pos')).join('')}
       <div class="bloco-t">Descontos</div>
@@ -928,7 +941,7 @@ function pdfHolerite(ids){
     const sec=t=>{ novaPag(); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(29,90,122); doc.text(t,ML,y); y+=5.5; };
     const ln=(a,b,neg)=>{ novaPag(); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(60,70,80); doc.text(tira(a),ML,y); doc.setTextColor(neg?178:23,neg?58:36,neg?72:47); doc.text((neg?'- ':'')+real(b),MR,y,{align:'right'}); doc.setDrawColor(226,231,235); doc.setLineWidth(0.2); doc.line(ML,y+2,MR,y+2); y+=7; };
     sec('A RECEBER'); ln(r.p.parcial?`Salario proporcional (${r.p.dias} dias)`:'Salario fixo',r.fixo);
-    r.comissoes.forEach(l=>ln(`Comissao${l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' - '+l.desc:''} (${brCurto(l.data)})`,l.valor));
+    r.comissoes.forEach(l=>ln(`Comissao${l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' - '+l.desc:''} (paga em ${br(pagamentoComissao(l))})`,l.valor));
     r.extras.forEach(v=>ln(`Viagem extra ${brCurto(v.data)} - ${fmtPlaca(v.placa)}${v.rota?' - '+v.rota:''}`,v.valorExtra));
     r.receitas.forEach(l=>ln(`${l.desc} (${quando(l)})`,l.valor));
     y+=3; sec('DESCONTOS');
@@ -979,7 +992,7 @@ function pdfHolerite(ids){
    com o saldo dia a dia para ver quando o dinheiro fica curto.
    ======================================================================= */
 function cfgCaixa(){ const c=cad.caixa.config||{}, d=v=>Math.min(31,Math.max(1,v));
-  return {dia:d(int(c.dia)||1), diaExtras:d(int(c.diaExtras)||15), mes:c.mes==='mesmo'?'mesmo':'seguinte'}; }
+  return {dia:d(int(c.dia)||1), diaExtras:d(int(c.diaExtras)||15), diaComissao:d(int(c.diaComissao)||15), mes:c.mes==='mesmo'?'mesmo':'seguinte'}; }
 /* Lançamentos automáticos do caixa (não ficam gravados, são calculados):
    - salário líquido de cada motorista, no dia configurado (padrão: dia 5 do mês seguinte)
    - cada vale (adiantamento), no dia em que foi dado */
@@ -988,15 +1001,39 @@ function caixaAuto(ym, incluirOcultos){
   const todos=caixaAutoTodos(ym);
   return incluirOcultos?todos:todos.filter(l=>!ocultos[l.id]);
 }
+const refTxt = ref => `${MESES[+ref.slice(5)-1].slice(0,3)}/${ref.slice(2,4)}`;
+const ehComissao = l => l.tipo==='comissao' || (l.tipo==='receita' && /comiss/i.test(l.desc||''));
+/* Data em que a comissão é paga: a escolhida no lançamento; se não tiver, o dia padrão das comissões no mês seguinte. */
+function pagamentoComissao(l){
+  if(l.pagamento) return l.pagamento;
+  const cfg=cfgCaixa(), ym=cfg.mes==='seguinte'?somaMes(l.data.slice(0,7),1):l.data.slice(0,7), [y,m]=ym.split('-').map(Number);
+  return ym+'-'+pad(Math.min(cfg.diaComissao,new Date(y,m,0).getDate()));
+}
+/* Divide o líquido do mês de referência em: salário base, viagens extras e cada comissão.
+   Se os descontos forem maiores que o salário base, a diferença sai das viagens extras e depois das comissões. */
+function divisaoPagamento(motId, ref){
+  const r=calcMes(motId,ref), com={};
+  let resto=Math.max(0,r.liquido);
+  const base=Math.max(0, r2(r.liquido-r.valorExtras-r.totComissoes)); resto=r2(resto-base);
+  const extras=Math.min(r.valorExtras,resto); resto=r2(resto-extras);
+  r.comissoes.forEach(l=>{ const v=Math.min(num(l.valor),resto); com[l.id]=r2(v); resto=r2(resto-v); });
+  return {r, base, extras:r2(extras), com};
+}
 function caixaAutoTodos(ym){
   const cfg=cfgCaixa(), ref=cfg.mes==='seguinte'?somaMes(ym,-1):ym, pagos=cad.caixa.pagosAuto||{};
   const [y,m]=ym.split('-').map(Number), ult=new Date(y,m,0).getDate(), dia=ym+'-'+pad(Math.min(cfg.dia,ult)), diaX=ym+'-'+pad(Math.min(cfg.diaExtras,ult));
-  const out=[], refTxt=`${MESES[+ref.slice(5)-1].slice(0,3)}/${ref.slice(2,4)}`;
-  ativosNoMes(ref).forEach(mo=>{ const r=calcMes(mo.id,ref); if(r.liquido<=0) return;
-    // salário base = líquido sem as viagens extras; se os descontos passarem do base, o resto sai das extras
-    const base=Math.max(0, r2(r.liquido-r.valorExtras-r.totComissoes)), extras=r2(r.liquido-base);
-    if(base>0){ const key='sal:'+ref+':'+mo.id; out.push({id:key, auto:'salario', ref, motoristaId:mo.id, tipo:'saida', data:dia, desc:`Salário ${mo.nome} (${refTxt})`, valor:base, pago:!!pagos[key]}); }
-    if(extras>0){ const key='ext:'+ref+':'+mo.id; out.push({id:key, auto:'extras', ref, motoristaId:mo.id, tipo:'saida', data:diaX, desc:`Comissão e extras ${mo.nome} (${refTxt})`, valor:extras, pago:!!pagos[key]}); }
+  const out=[];
+  ativosNoMes(ref).forEach(mo=>{ const d=divisaoPagamento(mo.id,ref);
+    if(d.base>0){ const key='sal:'+ref+':'+mo.id; out.push({id:key, auto:'salario', ref, motoristaId:mo.id, tipo:'saida', data:dia, desc:`Salário ${mo.nome} (${refTxt(ref)})`, valor:d.base, pago:!!pagos[key]}); }
+    if(d.extras>0){ const key='ext:'+ref+':'+mo.id; out.push({id:key, auto:'extras', ref, motoristaId:mo.id, tipo:'saida', data:diaX, desc:`Viagens extras ${mo.nome} (${refTxt(ref)})`, valor:d.extras, pago:!!pagos[key]}); }
+  });
+  // cada comissão no dia de pagamento escolhido
+  const cache={};
+  cad.lancs.filter(l=>ehComissao(l) && noMes(pagamentoComissao(l),ym)).forEach(l=>{
+    const lref=l.data.slice(0,7), k=l.motoristaId+'|'+lref; cache[k]=cache[k]||divisaoPagamento(l.motoristaId,lref);
+    const v=cache[k].com[l.id]; if(!v) return;
+    const key='com:'+l.id, desc=l.desc&&!/^comiss[aã]o$/i.test(l.desc)?' · '+l.desc:'';
+    out.push({id:key, auto:'comissao', ref:lref, lancId:l.id, motoristaId:l.motoristaId, tipo:'saida', data:pagamentoComissao(l), desc:`Comissão ${mot(l.motoristaId).nome} (${refTxt(lref)})${desc}`, valor:v, pago:!!pagos[key]});
   });
   cad.lancs.filter(l=>l.tipo==='vale'&&noMes(l.data,ym)).forEach(l=>{ const key='vale:'+l.id;
     out.push({id:key, auto:'vale', ref:ym, motoristaId:l.motoristaId, tipo:'saida', data:l.data, desc:`Vale ${mot(l.motoristaId).nome}${l.desc?' · '+l.desc:''}`, valor:num(l.valor), pago:pagos[key]!==undefined?!!pagos[key]:l.data<=hoje()}); });
@@ -1028,7 +1065,7 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':'do fechamento'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
@@ -1037,7 +1074,7 @@ R.caixa = () => {
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
   ${(()=>{ const o=cad.caixa.ocultos||{}, n=caixaAuto(ym,true).filter(l=>o[l.id]).length; return n?`<div class="ajuda" style="margin-top:10px">${n} lançamento(s) automático(s) tirado(s) deste mês. <button class="link" onclick="trazerAutos()">Trazer de volta</button></div>`:''; })()}
-  <div class="ajuda" style="margin-top:10px">Motoristas entram sozinhos: salário base no dia ${cfgCaixa().dia} e comissão/extras no dia ${cfgCaixa().diaExtras} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}; vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dias</button></div>
+  <div class="ajuda" style="margin-top:10px">Motoristas entram sozinhos: salário base no dia ${cfgCaixa().dia} e viagens extras no dia ${cfgCaixa().diaExtras} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}; cada comissão na data de pagamento escolhida nela; vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dias</button></div>
   ${C_manual(ym)?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
 };
 const C_manual = ym => cad.caixa.lancs.some(l=>noMes(l.data,ym));
@@ -1075,14 +1112,22 @@ function formCaixa(id){
     }});
 }
 function marcarPago(id,on){
-  if(/^(sal|ext|vale):/.test(id)){ cad.caixa.pagosAuto=cad.caixa.pagosAuto||{}; cad.caixa.pagosAuto[id]=on; salvar(); render(); return; }
+  if(/^(sal|ext|com|vale):/.test(id)){ cad.caixa.pagosAuto=cad.caixa.pagosAuto||{}; cad.caixa.pagosAuto[id]=on; salvar(); render(); return; }
   const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return; l.pago=on; salvar(); render(); }
 function abrirAuto(id){
   const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
   const sal=l.auto!=='vale';
+  if(l.auto==='comissao'){
+    abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
+      desc:`Comissão de ${esc(mot(l.motoristaId).nome)} referente a ${mesNome(l.ref)} (${brl(l.valor)}), paga em ${br(l.data)}. Para mudar o valor ou a data de pagamento, edite a comissão.`,
+      corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> Já foi paga</label>`,
+      extraFim:`<button type="button" class="btn danger" onclick="tirarAuto('${l.id}')">${I.lixo}Tirar do caixa</button>`,
+      extra:`<button type="button" class="btn sec" style="margin-right:auto" onclick="formLanc('${l.lancId}')">${I.editar}Editar comissão</button>`});
+    return;
+  }
   abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
     extraFim:`<button type="button" class="btn danger" onclick="tirarAuto('${l.id}')">${I.lixo}Tirar do caixa</button>`,
-    desc: sal ? `Vem do fechamento de ${mesNome(l.ref)}: ${l.auto==='extras'?'é a comissão + viagens extras':'é o salário (fixo + benefícios − vales, faltas e descontos)'} de ${esc(mot(l.motoristaId).nome)} (${brl(l.valor)}). Muda sozinho quando você lança vales, faltas, extras ou benefícios. Para tirar do caixa, desligue o motorista no cadastro.` : `Vem do vale lançado em ${br(l.data)} (${brl(l.valor)}). Para mudar ou apagar, edite o vale em “Vales, faltas e folgas”.`,
+    desc: sal ? `Vem do fechamento de ${mesNome(l.ref)}: ${l.auto==='extras'?'são as viagens marcadas como extra':'é o salário (fixo + benefícios − vales, faltas e descontos)'} de ${esc(mot(l.motoristaId).nome)} (${brl(l.valor)}). Muda sozinho quando você lança vales, faltas, extras ou benefícios. Para tirar do caixa, desligue o motorista no cadastro.` : `Vem do vale lançado em ${br(l.data)} (${brl(l.valor)}). Para mudar ou apagar, edite o vale em “Vales, faltas e folgas”.`,
     corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> Já foi pago</label>`,
     extra: sal?`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir fechamento</button>`:`<button type="button" class="btn sec" style="margin-right:auto" onclick="fecharModal();ir('motoristas',{lMot:'${l.motoristaId}'})">Abrir vales</button>`});
 }
@@ -1102,10 +1147,11 @@ function formConfigCaixa(){
   const c=cfgCaixa();
   abrirModal({titulo:'Quando os motoristas recebem', desc:'Os pagamentos entram sozinhos no fluxo de caixa, com os valores do fechamento.',
     corpo:`<div class="fg"><label class="field"><span>Salário base: dia</span><input class="inp num" name="dia" inputmode="numeric" value="${c.dia}"></label>
-    <label class="field"><span>Comissão e extras: dia</span><input class="inp num" name="diaX" inputmode="numeric" value="${c.diaExtras}"></label>
+    <label class="field"><span>Viagens extras: dia</span><input class="inp num" name="diaX" inputmode="numeric" value="${c.diaExtras}"></label>
+    <label class="field"><span>Comissão (dia sugerido)</span><input class="inp num" name="diaC" inputmode="numeric" value="${c.diaComissao}"></label>
     <label class="field full"><span>Mês</span><select class="inp" name="mes"><option value="seguinte" ${c.mes==='seguinte'?'selected':''}>Mês seguinte (trabalhou em outubro, recebe em novembro)</option><option value="mesmo" ${c.mes==='mesmo'?'selected':''}>No próprio mês</option></select></label></div>
-    <div class="ajuda">Salário base = fixo + benefícios − vales, faltas e descontos. Comissão e extras = comissões lançadas + viagens marcadas como extra. Se os descontos forem maiores que o salário base, a diferença sai da comissão.</div>`,
-    aoConfirmar:f=>{ const d=int(f.dia.value), x=int(f.diaX.value); if(d<1||d>31||x<1||x>31){ toast('Dias entre 1 e 31.',true); return false; } cad.caixa.config={dia:d, diaExtras:x, mes:f.mes.value}; salvar(); toast('Configuração salva'); }});
+    <div class="ajuda">Salário base = fixo + benefícios − vales, faltas e descontos. Viagens extras = viagens marcadas como extra. Cada comissão sai na data de pagamento escolhida nela; o dia aqui é só a sugestão para novas comissões. Se os descontos forem maiores que o salário base, a diferença sai das extras e depois das comissões.</div>`,
+    aoConfirmar:f=>{ const d=int(f.dia.value), x=int(f.diaX.value), c2=int(f.diaC.value); if([d,x,c2].some(v=>v<1||v>31)){ toast('Dias entre 1 e 31.',true); return false; } cad.caixa.config={dia:d, diaExtras:x, diaComissao:c2, mes:f.mes.value}; salvar(); toast('Configuração salva'); }});
 }
 function apagarCaixa(id){
   const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return;
