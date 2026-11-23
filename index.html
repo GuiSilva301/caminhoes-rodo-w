@@ -513,10 +513,10 @@ function fecharMais(){ $('mais').classList.remove('on'); }
 
 /* ============================ MODAL ============================ */
 let MODAL=null;
-function abrirModal({titulo, desc='', corpo='', ok='Salvar', cancelar='Cancelar', perigo=false, aoConfirmar, larg, extra=''}){
+function abrirModal({titulo, desc='', corpo='', ok='Salvar', cancelar='Cancelar', perigo=false, aoConfirmar, larg, extra='', extraFim=''}){
   MODAL={aoConfirmar};
   $('mbox').style.maxWidth=larg||'520px';
-  $('mbox').innerHTML=`<h2>${titulo}</h2>${desc?`<p class="desc">${desc}</p>`:''}<form id="mform" onsubmit="event.preventDefault();confirmarModal()">${corpo}<div class="acoes">${extra}${cancelar?`<button type="button" class="btn sec" onclick="fecharModal()">${cancelar}</button>`:''}${ok?`<button class="btn ${perigo?'danger':''}" id="mok">${ok}</button>`:''}</div></form>`;
+  $('mbox').innerHTML=`<h2>${titulo}</h2>${desc?`<p class="desc">${desc}</p>`:''}<form id="mform" onsubmit="event.preventDefault();confirmarModal()">${corpo}<div class="acoes">${extra}${extraFim}${cancelar?`<button type="button" class="btn sec" onclick="fecharModal()">${cancelar}</button>`:''}${ok?`<button class="btn ${perigo?'danger':''}" id="mok">${ok}</button>`:''}</div></form>`;
   $('modal').classList.add('on');
   setTimeout(()=>{ const f=$('mform')&&$('mform').querySelector('input:not([type=checkbox]):not([type=file]),select,textarea'); if(f && window.innerWidth>900) f.focus(); },30);
 }
@@ -966,7 +966,12 @@ function cfgCaixa(){ const c=cad.caixa.config||{}; return {dia:Math.min(31,Math.
 /* Lançamentos automáticos do caixa (não ficam gravados, são calculados):
    - salário líquido de cada motorista, no dia configurado (padrão: dia 5 do mês seguinte)
    - cada vale (adiantamento), no dia em que foi dado */
-function caixaAuto(ym){
+function caixaAuto(ym, incluirOcultos){
+  const ocultos=cad.caixa.ocultos||{};
+  const todos=caixaAutoTodos(ym);
+  return incluirOcultos?todos:todos.filter(l=>!ocultos[l.id]);
+}
+function caixaAutoTodos(ym){
   const cfg=cfgCaixa(), ref=cfg.mes==='seguinte'?somaMes(ym,-1):ym, pagos=cad.caixa.pagosAuto||{};
   const [y,m]=ym.split('-').map(Number), ult=new Date(y,m,0).getDate(), dia=ym+'-'+pad(Math.min(cfg.dia,ult));
   const out=[];
@@ -1006,10 +1011,11 @@ R.caixa = () => {
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
-      <td class="act hide-m">${l.auto?`<button class="btn sm ghost" onclick="abrirAuto('${l.id}')">Ver</button>`:`<button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button>`}</td></tr>`).join('')}
-    </tbody></table></div><div class="ajuda mob">Toque na descrição para editar, marcar como pago ou apagar.</div>`
+      <td class="act hide-m">${l.auto?`<button class="btn sm ghost" onclick="abrirAuto('${l.id}')">Ver</button><button class="icon-btn" title="Tirar do caixa" onclick="tirarAuto('${l.id}')">${I.lixo}</button>`:`<button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button>`}</td></tr>`).join('')}
+    </tbody></table></div><div class="ajuda mob">Toque na descrição para editar, marcar como pago ou apagar (inclusive os automáticos).</div>`
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
+  ${(()=>{ const o=cad.caixa.ocultos||{}, n=caixaAuto(ym,true).filter(l=>o[l.id]).length; return n?`<div class="ajuda" style="margin-top:10px">${n} lançamento(s) automático(s) tirado(s) deste mês. <button class="link" onclick="trazerAutos()">Trazer de volta</button></div>`:''; })()}
   <div class="ajuda" style="margin-top:10px">Salários dos motoristas entram sozinhos no dia ${cfgCaixa().dia} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}, e os vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dia</button></div>
   ${C_manual(ym)?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
 };
@@ -1052,9 +1058,22 @@ function abrirAuto(id){
   const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
   const sal=l.auto==='salario';
   abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
+    extraFim:`<button type="button" class="btn danger" onclick="tirarAuto('${l.id}')">${I.lixo}Tirar do caixa</button>`,
     desc: sal ? `Vem do fechamento de ${mesNome(l.ref)}: é o salário líquido de ${esc(mot(l.motoristaId).nome)} (${brl(l.valor)}). Muda sozinho quando você lança vales, faltas, extras ou benefícios. Para tirar do caixa, desligue o motorista no cadastro.` : `Vem do vale lançado em ${br(l.data)} (${brl(l.valor)}). Para mudar ou apagar, edite o vale em “Vales, faltas e folgas”.`,
     corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> ${sal?'Salário já foi pago':'Vale já foi pago'}</label>`,
     extra: sal?`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir fechamento</button>`:`<button type="button" class="btn sec" style="margin-right:auto" onclick="fecharModal();ir('motoristas',{lMot:'${l.motoristaId}'})">Abrir vales</button>`});
+}
+function tirarAuto(id){
+  const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
+  confirmar('Tirar do fluxo de caixa?', `${esc(l.desc)} · ${brl(l.valor)} em ${br(l.data)}. Sai só do fluxo de caixa: o fechamento e o holerite não mudam. Dá para trazer de volta depois.`, 'Tirar do caixa', ()=>{
+    cad.caixa.ocultos=cad.caixa.ocultos||{}; cad.caixa.ocultos[id]=true; salvar(); toast('Tirado do fluxo de caixa'); });
+}
+function trazerAutos(){
+  const ocultos=cad.caixa.ocultos||{}, ls=caixaAuto(V.mes,true).filter(l=>ocultos[l.id]);
+  abrirModal({titulo:'Lançamentos automáticos tirados deste mês', ok:'Trazer de volta', desc:'Marque os que devem voltar para o fluxo de caixa.',
+    corpo:ls.map(l=>`<label class="toggle"><input type="checkbox" name="v" value="${l.id}"> ${brCurto(l.data)} · ${esc(l.desc)} · ${brl(l.valor)}</label>`).join(''),
+    aoConfirmar:f=>{ const ids=[...f.querySelectorAll('input[name=v]:checked')].map(i=>i.value); if(!ids.length){ toast('Marque pelo menos um.',true); return false; }
+      ids.forEach(i=>delete cad.caixa.ocultos[i]); salvar(); toast(ids.length+' lançamento(s) de volta ao caixa'); }});
 }
 function formConfigCaixa(){
   const c=cfgCaixa();
