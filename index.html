@@ -386,14 +386,25 @@ const noMes = (d,ym) => String(d||'').startsWith(ym);
 function viagensDe(motId, ym){ return viagens.filter(v=>v.motoristaId===motId && noMes(v.data,ym)).sort(ordViagem); }
 function lancsDe(motId, ym, tipo){ return cad.lancs.filter(l=>l.motoristaId===motId && noMes(l.data,ym) && (!tipo||l.tipo===tipo)).sort((a,b)=>a.data.localeCompare(b.data)); }
 function ordViagem(a,b){ return (a.data||'').localeCompare(b.data||'') || (Number(a.kmSaida)||0)-(Number(b.kmSaida)||0) || (a.criado||0)-(b.criado||0); }
+/* Admissão e desligamento: no mês em que entrou ou saiu, o salário fixo é
+   proporcional aos dias (fixo ÷ 30 × dias). Fora do período, não recebe nada. */
+function periodo(m, ym){
+  const [y,mm]=ym.split('-').map(Number), ult=new Date(y,mm,0).getDate(), ini=ym+'-01', fim=ym+'-'+pad(ult);
+  const adm=m.admissao||'', des=m.desligamento||'';
+  if((adm&&adm>fim)||(des&&des<ini)) return {dentro:false, dias:0, parcial:false};
+  const di=adm&&adm>ini?+adm.slice(8):1, df=des&&des<fim?+des.slice(8):ult;
+  const parcial=di>1||df<ult;
+  return {dentro:true, parcial, dias:parcial?Math.min(30,df-di+1):30, di, df};
+}
+const desligadoAntes = (m, ym) => !!(m.desligamento && m.desligamento < ym+'-01');
 function calcMes(motId, ym){
-  const m=mot(motId);
+  const m=mot(motId), p=periodo(m,ym);
   const vs=viagensDe(motId,ym), extras=vs.filter(v=>v.extra);
   const L=t=>lancsDe(motId,ym,t);
   const r={ m, vs, extras, viagens:vs.length, km:soma(vs,v=>v.km),
-    fixo:r2(m.fixo), valorExtras:r2(soma(extras,v=>v.valorExtra)),
+    p, fixoCheio:r2(m.fixo), fixo:!p.dentro?0:p.parcial?r2(num(m.fixo)*p.dias/30):r2(m.fixo), valorExtras:r2(soma(extras,v=>v.valorExtra)),
     vales:L('vale'), faltas:L('falta'), folgas:L('folga') };
-  const mensais=(m.beneficios||[]).filter(b=>num(b.valor)>0 && (!b.desde||b.desde<=ym) && (!b.ate||b.ate>=ym)).map(b=>({desc:b.desc, valor:num(b.valor), tipo:b.tipo, mensal:true}));
+  const mensais=(m.beneficios||[]).filter(b=>p.dentro && num(b.valor)>0 && (!b.desde||b.desde<=ym) && (!b.ate||b.ate>=ym)).map(b=>({desc:b.desc, valor:num(b.valor), tipo:b.tipo, mensal:true}));
   r.receitas=[...mensais.filter(b=>b.tipo!=='desconto'), ...L('receita')];
   r.descontos=[...mensais.filter(b=>b.tipo==='desconto'), ...L('desconto')];
   r.totReceitas=r2(soma(r.receitas,l=>l.valor));
@@ -407,7 +418,7 @@ const quando = l => l.mensal ? 'todo mês' : brCurto(l.data);
 const SUGESTOES = ['Vale transporte','Vale refeição','Vale alimentação','Cesta básica','Salário família','Ajuda de custo','Diária de viagem','Plano de saúde','Desconto vale transporte (6%)','Adiantamento','Pensão alimentícia','Empréstimo'];
 const datalistSug = () => `<datalist id="sugDesc">${SUGESTOES.map(x=>`<option value="${x}">`).join('')}</datalist>`;
 function ativosNoMes(ym){
-  return cad.motoristas.filter(m=>m.ativo!==false || viagens.some(v=>v.motoristaId===m.id&&noMes(v.data,ym)) || cad.lancs.some(l=>l.motoristaId===m.id&&noMes(l.data,ym)));
+  return cad.motoristas.filter(m=>(m.ativo!==false && periodo(m,ym).dentro) || viagens.some(v=>v.motoristaId===m.id&&noMes(v.data,ym)) || cad.lancs.some(l=>l.motoristaId===m.id&&noMes(l.data,ym)));
 }
 
 /* ============================ DADOS ============================ */
@@ -515,7 +526,7 @@ function confirmar(titulo, desc, ok, fn){ abrirModal({titulo, desc, ok, perigo:t
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('on')) fecharModal(); fecharMais(); } });
 
 const R = {};
-const optsMot = (sel, todos) => (todos?`<option value="">${todos}</option>`:'')+cad.motoristas.filter(m=>m.ativo!==false||m.id===sel).map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.nome)}</option>`).join('');
+const optsMot = (sel, todos) => (todos?`<option value="">${todos}</option>`:'')+cad.motoristas.filter(m=>(m.ativo!==false&&!desligadoAntes(m,mesAtual()))||m.id===sel).map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.nome)}</option>`).join('');
 const optsPlaca = (sel, todos) => (todos?`<option value="">${todos}</option>`:'')+['racao','leite'].map(t=>{
   const cs=cad.caminhoes.filter(c=>c.tipo===t&&(c.ativo!==false||normPlaca(c.placa)===normPlaca(sel))); if(!cs.length) return '';
   return `<optgroup label="${tipoNome(t)}">${cs.map(c=>`<option value="${esc(c.placa)}" ${normPlaca(c.placa)===normPlaca(sel)?'selected':''}>${esc(c.placa)}${c.modelo?' · '+esc(c.modelo):''}</option>`).join('')}</optgroup>`;
@@ -526,7 +537,7 @@ function seletorMes(){ return `<div class="mesnav"><button class="icon-btn" oncl
 R.inicio = () => {
   const ym=V.mes, vs=viagens.filter(v=>noMes(v.data,ym)), gs=gastos.filter(g=>noMes(g.data,ym));
   const ext=vs.filter(v=>v.extra);
-  const semFixo=cad.motoristas.filter(m=>m.ativo!==false && !num(m.fixo));
+  const semFixo=cad.motoristas.filter(m=>m.ativo!==false && periodo(m,ym).dentro && !num(m.fixo));
   const porMot=ativosNoMes(ym).map(m=>{ const a=vs.filter(v=>v.motoristaId===m.id); return {m, n:a.length, km:soma(a,v=>v.km), ext:a.filter(v=>v.extra).length}; });
   const porCam=cad.caminhoes.map(c=>{ const a=vs.filter(v=>normPlaca(v.placa)===normPlaca(c.placa)), g=gs.filter(x=>normPlaca(x.placa)===normPlaca(c.placa)); return {c, n:a.length, km:soma(a,v=>v.km), carga:soma(a,v=>v.carga), gasto:soma(g,x=>x.valor)}; }).filter(x=>x.c.ativo!==false||x.n||x.gasto);
   return `
@@ -851,11 +862,11 @@ function cartaoHolerite(r){
   const ln=(a,b,cls)=>`<div class="ln"><span>${a}</span><span class="money ${cls||''}">${b}</span></div>`;
   return `<div class="holerite ${ab?'aberto':''}">
     <div class="topo" onclick="V.abertos['${id}']=!V.abertos['${id}'];render()">${av(r.m)}
-      <div class="nome"><b>${esc(r.m.nome)}</b><span class="muted" style="font-size:13px">${r.viagens} viagem(ns) · ${inteiro(r.km)} km${r.extras.length?` · <span class="tag t-warn">${r.extras.length} extra(s)</span>`:''}${!r.fixo?' · <span class="tag t-bad">sem salário fixo</span>':''}</span></div>
+      <div class="nome"><b>${esc(r.m.nome)}</b><span class="muted" style="font-size:13px">${r.viagens} viagem(ns) · ${inteiro(r.km)} km${r.extras.length?` · <span class="tag t-warn">${r.extras.length} extra(s)</span>`:''}${r.m.desligamento&&noMes(r.m.desligamento,V.mes)?` · <span class="tag t-mut">desligado em ${brCurto(r.m.desligamento)}</span>`:''}${!r.fixoCheio?' · <span class="tag t-bad">sem salário fixo</span>':''}</span></div>
       <div class="liq"><div class="muted" style="font-size:12px">Líquido</div><div class="money">${brl(r.liquido)}</div></div></div>
     <div class="corpo"><div>
       <div class="bloco-t">A receber</div>
-      ${ln('Salário fixo',brl(r.fixo))}
+      ${ln(r.p.parcial?`Salário proporcional <span class="muted">(${r.p.dias} dias${r.m.desligamento&&noMes(r.m.desligamento,V.mes)?', desligado em '+brCurto(r.m.desligamento):''}${r.m.admissao&&noMes(r.m.admissao,V.mes)?', admitido em '+brCurto(r.m.admissao):''})</span>`:'Salário fixo',brl(r.fixo))}
       ${r.extras.map(v=>ln(`Viagem extra ${brCurto(v.data)} · ${esc(fmtPlaca(v.placa))}${v.rota?' · '+esc(v.rota):''}`,brl(v.valorExtra),'pos')).join('')}
       ${r.receitas.map(l=>ln(esc(l.desc)+` <span class="muted">(${quando(l)})</span>`,brl(l.valor),'pos')).join('')}
       <div class="bloco-t">Descontos</div>
@@ -901,7 +912,7 @@ function pdfHolerite(ids){
     doc.text(`${r.viagens} viagem(ns) no mes  |  ${inteiro(r.km)} km`,ML,y+5.5); y+=14;
     const sec=t=>{ novaPag(); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(29,90,122); doc.text(t,ML,y); y+=5.5; };
     const ln=(a,b,neg)=>{ novaPag(); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(60,70,80); doc.text(tira(a),ML,y); doc.setTextColor(neg?178:23,neg?58:36,neg?72:47); doc.text((neg?'- ':'')+real(b),MR,y,{align:'right'}); doc.setDrawColor(226,231,235); doc.setLineWidth(0.2); doc.line(ML,y+2,MR,y+2); y+=7; };
-    sec('A RECEBER'); ln('Salario fixo',r.fixo);
+    sec('A RECEBER'); ln(r.p.parcial?`Salario proporcional (${r.p.dias} dias)`:'Salario fixo',r.fixo);
     r.extras.forEach(v=>ln(`Viagem extra ${brCurto(v.data)} - ${fmtPlaca(v.placa)}${v.rota?' - '+v.rota:''}`,v.valorExtra));
     r.receitas.forEach(l=>ln(`${l.desc} (${quando(l)})`,l.valor));
     y+=3; sec('DESCONTOS');
@@ -951,9 +962,23 @@ function pdfHolerite(ids){
    Saldo inicial do mês + entradas − saídas, em ordem de data,
    com o saldo dia a dia para ver quando o dinheiro fica curto.
    ======================================================================= */
+function cfgCaixa(){ const c=cad.caixa.config||{}; return {dia:Math.min(31,Math.max(1,int(c.dia)||5)), mes:c.mes==='mesmo'?'mesmo':'seguinte'}; }
+/* Lançamentos automáticos do caixa (não ficam gravados, são calculados):
+   - salário líquido de cada motorista, no dia configurado (padrão: dia 5 do mês seguinte)
+   - cada vale (adiantamento), no dia em que foi dado */
+function caixaAuto(ym){
+  const cfg=cfgCaixa(), ref=cfg.mes==='seguinte'?somaMes(ym,-1):ym, pagos=cad.caixa.pagosAuto||{};
+  const [y,m]=ym.split('-').map(Number), ult=new Date(y,m,0).getDate(), dia=ym+'-'+pad(Math.min(cfg.dia,ult));
+  const out=[];
+  ativosNoMes(ref).forEach(mo=>{ const r=calcMes(mo.id,ref); if(r.liquido>0){ const key='sal:'+ref+':'+mo.id;
+    out.push({id:key, auto:'salario', ref, motoristaId:mo.id, tipo:'saida', data:dia, desc:`Salário ${mo.nome} (${MESES[+ref.slice(5)-1].slice(0,3)}/${ref.slice(2,4)})`, valor:r.liquido, pago:!!pagos[key]}); } });
+  cad.lancs.filter(l=>l.tipo==='vale'&&noMes(l.data,ym)).forEach(l=>{ const key='vale:'+l.id;
+    out.push({id:key, auto:'vale', ref:ym, motoristaId:l.motoristaId, tipo:'saida', data:l.data, desc:`Vale ${mot(l.motoristaId).nome}${l.desc?' · '+l.desc:''}`, valor:num(l.valor), pago:pagos[key]!==undefined?!!pagos[key]:l.data<=hoje()}); });
+  return out;
+}
 function caixaMes(ym){
   const C=cad.caixa, ini=C.saldos[ym];
-  const ls=C.lancs.filter(l=>noMes(l.data,ym)).sort((a,b)=>a.data.localeCompare(b.data)||(a.tipo==='entrada'?-1:1)||(a.criado||0)-(b.criado||0));
+  const ls=[...C.lancs.filter(l=>noMes(l.data,ym)), ...caixaAuto(ym)].sort((a,b)=>a.data.localeCompare(b.data)||(a.tipo==='entrada'?-1:1)||(a.criado||0)-(b.criado||0));
   let saldo=num(ini), menor=null;
   const linhas=ls.map(l=>{ saldo=r2(saldo+(l.tipo==='entrada'?1:-1)*num(l.valor)); if(menor===null||saldo<menor.saldo) menor={saldo,data:l.data}; return {...l, saldo}; });
   const ent=r2(soma(ls.filter(l=>l.tipo==='entrada'),l=>l.valor)), sai=r2(soma(ls.filter(l=>l.tipo!=='entrada'),l=>l.valor));
@@ -977,16 +1002,18 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="formCaixa('${l.id}')">${esc(l.desc)}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.auto?` <span class="tag t-acc">${l.auto==='salario'?'do fechamento':'dos vales'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
-      <td class="act hide-m"><button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button></td></tr>`).join('')}
+      <td class="act hide-m">${l.auto?`<button class="btn sm ghost" onclick="abrirAuto('${l.id}')">Ver</button>`:`<button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button>`}</td></tr>`).join('')}
     </tbody></table></div><div class="ajuda mob">Toque na descrição para editar, marcar como pago ou apagar.</div>`
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
-  ${c.linhas.length?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
+  <div class="ajuda" style="margin-top:10px">Salários dos motoristas entram sozinhos no dia ${cfgCaixa().dia} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}, e os vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dia</button></div>
+  ${C_manual(ym)?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
 };
+const C_manual = ym => cad.caixa.lancs.some(l=>noMes(l.data,ym));
 function formSaldo(){
   const c=caixaMes(V.mes);
   abrirModal({titulo:'Saldo do começo do mês', desc:`Quanto tinha na conta no dia 1º de ${mesNome(V.mes)}.`,
@@ -1018,7 +1045,24 @@ function formCaixa(id){
       else toast(id?'Lançamento atualizado':'Lançamento salvo');
     }});
 }
-function marcarPago(id,on){ const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return; l.pago=on; salvar(); render(); }
+function marcarPago(id,on){
+  if(/^(sal|vale):/.test(id)){ cad.caixa.pagosAuto=cad.caixa.pagosAuto||{}; cad.caixa.pagosAuto[id]=on; salvar(); render(); return; }
+  const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return; l.pago=on; salvar(); render(); }
+function abrirAuto(id){
+  const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
+  const sal=l.auto==='salario';
+  abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
+    desc: sal ? `Vem do fechamento de ${mesNome(l.ref)}: é o salário líquido de ${esc(mot(l.motoristaId).nome)} (${brl(l.valor)}). Muda sozinho quando você lança vales, faltas, extras ou benefícios. Para tirar do caixa, desligue o motorista no cadastro.` : `Vem do vale lançado em ${br(l.data)} (${brl(l.valor)}). Para mudar ou apagar, edite o vale em “Vales, faltas e folgas”.`,
+    corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> ${sal?'Salário já foi pago':'Vale já foi pago'}</label>`,
+    extra: sal?`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir fechamento</button>`:`<button type="button" class="btn sec" style="margin-right:auto" onclick="fecharModal();ir('motoristas',{lMot:'${l.motoristaId}'})">Abrir vales</button>`});
+}
+function formConfigCaixa(){
+  const c=cfgCaixa();
+  abrirModal({titulo:'Quando os salários são pagos', desc:'Os salários dos motoristas entram sozinhos no fluxo de caixa, com o valor líquido do fechamento.',
+    corpo:`<div class="fg"><label class="field"><span>Dia do pagamento</span><input class="inp num" name="dia" inputmode="numeric" value="${c.dia}"></label>
+    <label class="field"><span>Mês</span><select class="inp" name="mes"><option value="seguinte" ${c.mes==='seguinte'?'selected':''}>Mês seguinte (salário de outubro pago em novembro)</option><option value="mesmo" ${c.mes==='mesmo'?'selected':''}>No próprio mês</option></select></label></div>`,
+    aoConfirmar:f=>{ const d=int(f.dia.value); if(d<1||d>31){ toast('Dia entre 1 e 31.',true); return false; } cad.caixa.config={dia:d, mes:f.mes.value}; salvar(); toast('Configuração salva'); }});
+}
 function apagarCaixa(id){
   const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return;
   confirmar('Apagar este lançamento?', `${esc(l.desc)} · ${brl(l.valor)} em ${br(l.data)}.`, 'Apagar', ()=>{ cad.caixa.lancs=cad.caixa.lancs.filter(x=>x.id!==id); salvar(); toast('Lançamento apagado'); });
@@ -1103,8 +1147,8 @@ R.cadastros = () => `
   <div class="grid2">
   <div class="panel"><div class="panel-h"><div><h2>Motoristas</h2><p class="sub">O salário fixo entra no fechamento de cada mês.</p></div><button class="btn sm" onclick="formMot()">${I.lancar}Novo</button></div>
     <div class="tw"><table><thead><tr><th>Nome</th><th class="n">Salário fixo</th><th></th></tr></thead><tbody>
-    ${cad.motoristas.map(m=>`<tr><td><span class="pessoa">${av(m)}${esc(m.nome)}${m.ativo===false?' <span class="tag t-mut">inativo</span>':''}</span></td><td class="n money">${num(m.fixo)?brl(m.fixo):'<span class="tag t-bad">não informado</span>'}${(m.beneficios||[]).length?`<div class="muted" style="font-size:12px;font-family:Manrope;white-space:normal">+ ${m.beneficios.map(b=>esc(b.desc)).join(', ')}</div>`:''}</td>
-      <td class="act"><button class="icon-btn" title="Editar" onclick="formMot('${m.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarMot('${m.id}')">${I.lixo}</button></td></tr>`).join('')}
+    ${[...cad.motoristas].sort((a,b)=>!!a.desligamento-!!b.desligamento).map(m=>`<tr${m.desligamento?' style="opacity:.7"':''}><td><span class="pessoa">${av(m)}<span>${esc(m.nome)}${m.ativo===false?' <span class="tag t-mut">inativo</span>':''}${m.desligamento?`<br><span class="tag t-mut">desligado em ${br(m.desligamento)}</span>`:''}</span></span></td><td class="n money">${num(m.fixo)?brl(m.fixo):'<span class="tag t-bad">não informado</span>'}${(m.beneficios||[]).length?`<div class="muted" style="font-size:12px;font-family:Manrope;white-space:normal">+ ${m.beneficios.map(b=>esc(b.desc)).join(', ')}</div>`:''}</td>
+      <td class="act">${m.desligamento?'':`<button class="btn sm ghost" onclick="formDesligar('${m.id}')">Desligar</button>`}<button class="icon-btn" title="Editar" onclick="formMot('${m.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarMot('${m.id}')">${I.lixo}</button></td></tr>`).join('')}
     </tbody></table></div></div>
   <div class="panel"><div class="panel-h"><div><h2>Caminhões</h2><p class="sub">A placa liga as viagens e os gastos de manutenção.</p></div><button class="btn sm" onclick="formCam()">${I.lancar}Novo</button></div>
     <div class="tw"><table><thead><tr><th>Placa</th><th>Tipo</th><th class="hide-m">Modelo</th><th></th></tr></thead><tbody>
@@ -1118,7 +1162,10 @@ function formMot(id){
   BEN=JSON.parse(JSON.stringify(m.beneficios||[]));
   abrirModal({titulo:id?'Editar motorista':'Novo motorista', larg:'640px',
     corpo:`<div class="fg"><label class="field"><span>Nome</span><input class="inp" name="nome" value="${esc(m.nome)}" required></label>
-    <label class="field"><span>Salário fixo mensal (R$)</span><input class="inp num" name="fixo" inputmode="decimal" value="${fmtInp(m.fixo)}"></label></div>
+    <label class="field"><span>Salário fixo mensal (R$)</span><input class="inp num" name="fixo" inputmode="decimal" value="${fmtInp(m.fixo)}"></label>
+    <label class="field"><span>Admissão (opcional)</span><input class="inp" type="date" name="adm" value="${esc(m.admissao||'')}"></label>
+    <label class="field"><span>Desligamento</span><input class="inp" type="date" name="des" value="${esc(m.desligamento||'')}"></label></div>
+    <div class="ajuda">No mês da admissão ou do desligamento o salário fixo sai proporcional aos dias. Depois do desligamento o motorista some das listas e do fluxo de caixa; o histórico continua guardado. Para cancelar um desligamento, apague a data.</div>
     <div class="bloco-t" style="margin-top:20px">Benefícios e descontos de todo mês (se tiver)</div>
     <div class="ajuda" style="margin-top:0">Vale transporte, vale refeição, cesta básica… Entram sozinhos no fechamento a partir do mês escolhido. Deixe o “até” vazio se não tiver fim.</div>
     <div id="benList"></div>
@@ -1129,7 +1176,8 @@ function formMot(id){
       const bens=BEN.filter(b=>b.desc.trim()||num(b.valor));
       if(bens.some(b=>!b.desc.trim()||num(b.valor)<=0)){ toast('Preencha descrição e valor de cada benefício ou desconto.',true); return false; }
       if(bens.some(b=>b.ate&&b.desde&&b.ate<b.desde)){ toast('O mês “até” não pode ser antes do “a partir de”.',true); return false; }
-      const o={nome, fixo:num(f.fixo.value), ativo:f.ativo.checked, beneficios:bens.map(b=>({id:b.id,desc:b.desc.trim(),valor:num(b.valor),tipo:b.tipo,desde:b.desde||'',ate:b.ate||''}))};
+      if(f.adm.value&&f.des.value&&f.des.value<f.adm.value){ toast('O desligamento não pode ser antes da admissão.',true); return false; }
+      const o={nome, fixo:num(f.fixo.value), ativo:f.ativo.checked, admissao:f.adm.value, desligamento:f.des.value, beneficios:bens.map(b=>({id:b.id,desc:b.desc.trim(),valor:num(b.valor),tipo:b.tipo,desde:b.desde||'',ate:b.ate||''}))};
       if(id) Object.assign(m,o); else cad.motoristas.push({id:uid(),...o});
       salvar(); toast('Motorista salvo'); }});
   desenharBen();
@@ -1143,6 +1191,14 @@ function desenharBen(){
     <label><span>A partir de</span><input class="inp" type="month" value="${b.desde||''}" onchange="BEN[${i}].desde=this.value"></label>
     <label><span>Até</span><input class="inp" type="month" value="${b.ate||''}" onchange="BEN[${i}].ate=this.value"></label>
     <button type="button" class="icon-btn" title="Remover" onclick="BEN.splice(${i},1);desenharBen()">${I.lixo}</button></div>`).join(''):'<div class="muted" style="font-size:13px;margin-top:8px">Nenhum. Só adicione se este motorista tiver.</div>';
+}
+function formDesligar(id){
+  const m=cad.motoristas.find(x=>x.id===id); if(!m) return;
+  abrirModal({titulo:'Desligar '+esc(m.nome), ok:'Desligar', perigo:true,
+    desc:'O salário do mês do desligamento sai proporcional aos dias trabalhados. Depois disso ele não aparece mais nas listas nem no fluxo de caixa. Viagens e holerites antigos continuam guardados.',
+    corpo:`<label class="field"><span>Data do desligamento (último dia trabalhado)</span><input class="inp" type="date" name="des" value="${hoje()}" required></label>`,
+    aoConfirmar:f=>{ if(!f.des.value){ toast('Informe a data.',true); return false; } if(m.admissao&&f.des.value<m.admissao){ toast('A data é antes da admissão.',true); return false; }
+      m.desligamento=f.des.value; salvar(); toast(m.nome+' desligado em '+br(m.desligamento)); }});
 }
 function apagarMot(id){
   const m=cad.motoristas.find(x=>x.id===id); if(!m) return;
