@@ -102,7 +102,7 @@ tr:last-child td{border-bottom:0}
 tfoot td{border-top:2px solid var(--line2);font-weight:700}
 th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 td.act{text-align:right;white-space:nowrap}
-.nc{display:none} .mob{display:none}
+.nc{display:none} .mob{display:none} .tag.nc{display:none}
 .pessoa{display:flex;align-items:center;gap:10px;font-weight:600}
 .av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0;color:#fff}
 .placa{display:inline-block;font-weight:700;font-size:13px;letter-spacing:.04em;border:1.5px solid var(--ink);border-radius:5px;padding:0 6px;background:#fff;white-space:nowrap}
@@ -229,7 +229,7 @@ td.act{text-align:right;white-space:nowrap}
   .fg,.fg3{grid-template-columns:1fr 1fr}
   td.hide-m,th.hide-m,.hide-m{display:none}
   td.act .icon-btn{padding:4px}
-  .nf{display:none} .nc{display:inline} td.nc{display:table-cell} .mob{display:block}
+  .nf{display:none} .nc{display:inline} td.nc{display:table-cell} .mob{display:block} .tag.nc{display:inline-block}
   #modal{padding:16px 8px}
   .benrow{grid-template-columns:1fr 1fr}
   .benrow .icon-btn{grid-column:1/-1;justify-self:end}
@@ -1007,7 +1007,10 @@ function cfgCaixa(){ const c=cad.caixa.config||{}, d=v=>Math.min(31,Math.max(1,v
    - cada vale (adiantamento), no dia em que foi dado */
 function caixaAuto(ym, incluirOcultos){
   const ocultos=cad.caixa.ocultos||{};
-  const todos=caixaAutoTodos(ym);
+  // ajustes feitos direto no caixa: mudam só o valor/dia no fluxo, não o holerite
+  const aj=cad.caixa.ajustes||{};
+  const todos=caixaAutoTodos(ym).map(l=>{ const a=aj[l.id]; if(!a) return l;
+    return {...l, valorHolerite:l.valor, dataOriginal:l.data, valor:a.valor!=null?num(a.valor):l.valor, data:a.data&&noMes(a.data,ym)?a.data:l.data, ajustado:true, obsAjuste:a.obs||''}; });
   return incluirOcultos?todos:todos.filter(l=>!ocultos[l.id]);
 }
 const refTxt = ref => `${MESES[+ref.slice(5)-1].slice(0,3)}/${ref.slice(2,4)}`;
@@ -1074,11 +1077,11 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.ajustado?` <span class="tag t-warn" title="Holerite: ${brl(l.valorHolerite)}">ajustado no caixa</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}${l.obsAjuste?`<div class="muted" style="font-size:12px">${esc(l.obsAjuste)}</div>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
-      <td class="act hide-m">${l.auto?`<button class="btn sm ghost" onclick="abrirAuto('${l.id}')">Ver</button><button class="icon-btn" title="Tirar do caixa" onclick="tirarAuto('${l.id}')">${I.lixo}</button>`:`<button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button>`}</td></tr>`).join('')}
+      <td class="act hide-m">${l.auto?`<button class="icon-btn" title="Alterar no caixa" onclick="abrirAuto('${l.id}')">${I.editar}</button><button class="icon-btn" title="Tirar do caixa" onclick="tirarAuto('${l.id}')">${I.lixo}</button>`:`<button class="icon-btn" title="Editar" onclick="formCaixa('${l.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarCaixa('${l.id}')">${I.lixo}</button>`}</td></tr>`).join('')}
     </tbody></table></div><div class="ajuda mob">Toque na descrição para editar, marcar como pago ou apagar (inclusive os automáticos).</div>`
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
@@ -1126,21 +1129,35 @@ function marcarPago(id,on){
   const l=cad.caixa.lancs.find(x=>x.id===id); if(!l) return; l.pago=on; salvar(); render(); }
 function abrirAuto(id){
   const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
-  const sal=l.auto!=='vale';
-  if(l.auto==='comissao'){
-    abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
-      desc:`Comissão de ${esc(mot(l.motoristaId).nome)} referente a ${mesNome(l.ref)} (${brl(l.valor)}), paga em ${br(l.data)}. Para mudar o valor ou a data de pagamento, edite a comissão.`,
-      corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> Já foi paga</label>`,
-      extraFim:`<button type="button" class="btn danger" onclick="tirarAuto('${l.id}')">${I.lixo}Tirar do caixa</button>`,
-      extra:`<button type="button" class="btn sec" style="margin-right:auto" onclick="formLanc('${l.lancId}')">${I.editar}Editar comissão</button>`});
-    return;
-  }
-  abrirModal({titulo:esc(l.desc), ok:'', cancelar:'Fechar',
+  const nome=esc(mot(l.motoristaId).nome), orig=l.ajustado?l.valorHolerite:l.valor;
+  const origem={salario:`salário de ${mesNome(l.ref)} (fixo + benefícios − vales, faltas e descontos)`, extras:`viagens extras de ${mesNome(l.ref)}`, comissao:`comissão referente a ${mesNome(l.ref)}`, vale:`vale lançado em ${br(l.dataOriginal||l.data)}`}[l.auto];
+  const botao={salario:`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir holerite</button>`,
+    extras:`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir holerite</button>`,
+    comissao:`<button type="button" class="btn sec" style="margin-right:auto" onclick="formLanc('${l.lancId}')">Editar comissão</button>`,
+    vale:`<button type="button" class="btn sec" style="margin-right:auto" onclick="fecharModal();ir('motoristas',{lMot:'${l.motoristaId}'})">Abrir vales</button>`}[l.auto];
+  abrirModal({titulo:esc(l.desc), ok:'Salvar no caixa',
+    desc:`Vem do ${origem} de ${nome}. No holerite: <b>${brl(orig)}</b>. Mudar o valor ou o dia aqui altera <b>só o fluxo de caixa</b>; o holerite continua igual.`,
+    corpo:`<div class="fg">
+      <label class="field"><span>Valor pago (no caixa)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}"></label>
+      <label class="field"><span>Dia (neste mês)</span><input class="inp" type="date" name="data" value="${l.data}" min="${V.mes}-01" max="${V.mes}-31"></label>
+      <label class="field full"><span>Observação (opcional)</span><input class="inp" name="obs" value="${esc(l.obsAjuste||'')}" placeholder="Ex.: pago a menos, faltou acertar R$ 100"></label></div>
+      <label class="toggle"><input type="checkbox" name="pago" ${l.pago?'checked':''}> Já foi pago</label>
+      ${l.ajustado?`<div class="aviso info" style="margin-top:14px;margin-bottom:0"><div><b>Valor ajustado no caixa</b>Holerite: ${brl(orig)} em ${br(l.dataOriginal)}. <button type="button" class="link" onclick="voltarAjuste('${l.id}')">Voltar ao valor do holerite</button></div></div>`:''}`,
+    extra:botao,
     extraFim:`<button type="button" class="btn danger" onclick="tirarAuto('${l.id}')">${I.lixo}Tirar do caixa</button>`,
-    desc: sal ? `Vem do fechamento de ${mesNome(l.ref)}: ${l.auto==='extras'?'são as viagens marcadas como extra':'é o salário (fixo + benefícios − vales, faltas e descontos)'} de ${esc(mot(l.motoristaId).nome)} (${brl(l.valor)}). Muda sozinho quando você lança vales, faltas, extras ou benefícios. Para tirar do caixa, desligue o motorista no cadastro.` : `Vem do vale lançado em ${br(l.data)} (${brl(l.valor)}). Para mudar ou apagar, edite o vale em “Vales, faltas e folgas”.`,
-    corpo:`<label class="toggle"><input type="checkbox" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)"> Já foi pago</label>`,
-    extra: sal?`<button type="button" class="btn sec" style="margin-right:auto" onclick="V.abertos['${l.motoristaId}']=true;fecharModal();ir('fechamento',{mes:'${l.ref}'})">Abrir fechamento</button>`:`<button type="button" class="btn sec" style="margin-right:auto" onclick="fecharModal();ir('motoristas',{lMot:'${l.motoristaId}'})">Abrir vales</button>`});
+    aoConfirmar:f=>{
+      const v=num(f.valor.value), d=f.data.value;
+      if(v<=0){ toast('Informe o valor. Para não ter este pagamento, use “Tirar do caixa”.',true); return false; }
+      if(!d||!noMes(d,V.mes)){ toast('O dia tem que ser dentro de '+mesNome(V.mes)+'.',true); return false; }
+      cad.caixa.ajustes=cad.caixa.ajustes||{}; cad.caixa.pagosAuto=cad.caixa.pagosAuto||{};
+      const dataOrig=l.dataOriginal||l.data, obs=f.obs.value.trim();
+      if(r2(v)===r2(orig) && d===dataOrig && !obs) delete cad.caixa.ajustes[id];
+      else cad.caixa.ajustes[id]={valor:r2(v), data:d, obs};
+      cad.caixa.pagosAuto[id]=f.pago.checked;
+      salvar(); toast(r2(v)!==r2(orig)?'Valor alterado só no fluxo de caixa':'Salvo');
+    }});
 }
+function voltarAjuste(id){ if(cad.caixa.ajustes) delete cad.caixa.ajustes[id]; salvar(); fecharModal(); toast('Voltou ao valor do holerite'); }
 function tirarAuto(id){
   const l=caixaAuto(V.mes).find(x=>x.id===id); if(!l) return;
   confirmar('Tirar do fluxo de caixa?', `${esc(l.desc)} · ${brl(l.valor)} em ${br(l.data)}. Sai só do fluxo de caixa: o fechamento e o holerite não mudam. Dá para trazer de volta depois.`, 'Tirar do caixa', ()=>{
