@@ -594,7 +594,7 @@ function cargaResumo(vs){
 function tabelaViagens(vs, compacta){
   return `<div class="tw"><table><thead><tr><th>Data</th>${compacta?'':'<th class="hide-m">Motorista</th>'}<th>Placa</th><th class="hide-m">Rota</th><th class="n">Km</th><th class="n hide-m">Bocas</th><th class="n hide-m">Carga</th><th class="n">Extra</th><th></th></tr></thead><tbody>
   ${vs.map(v=>{ const m=mot(v.motoristaId); return `<tr>
-    <td>${brCurto(v.data)}<div class="nc muted" style="font-size:12px">${esc(m.nome.split(' ')[0])}</div></td>${compacta?'':`<td class="hide-m"><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>`}
+    <td>${brCurto(v.data)}${compacta?'':`<div class="nc muted" style="font-size:12px">${esc(m.nome.split(' ')[0])}</div>`}</td>${compacta?'':`<td class="hide-m"><span class="pessoa">${av(m)}${esc(m.nome)}</span></td>`}
     <td>${placaTag(v.placa)}</td><td class="hide-m">${esc(v.rota||'')}${v.obs?`<div class="muted" style="font-size:12px">${esc(v.obs)}</div>`:''}</td>
     <td class="n">${inteiro(v.km)}</td><td class="n hide-m">${v.bocas||''}</td><td class="n hide-m">${v.carga?inteiro(v.carga)+' '+unidade(v.placa):''}</td>
     <td class="n"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" class="chk" ${v.extra?'checked':''} onchange="marcarExtra('${v.id}',this.checked)" aria-label="Viagem extra">${v.extra?`<span class="money">${brl(v.valorExtra)}</span>`:''}</label></td>
@@ -874,7 +874,10 @@ function cartaoHolerite(r){
       <div class="bloco-t" style="margin-top:16px">Viagens do mês</div>
       <div class="muted" style="font-size:13px">${r.viagens} viagem(ns), ${inteiro(r.km)} km. Para marcar extras, abra a lista de viagens.</div>
       <div class="tools" style="margin-top:10px"><button class="btn sm sec" onclick="ir('viagens',{fMot:'${id}',fPlaca:''})">${I.viagens}Ver viagens</button><button class="btn sm" onclick="pdfHolerite(['${id}'])">${I.pdf}Holerite em PDF</button></div>
-    </div></div></div>`;
+    </div>
+    <div style="grid-column:1/-1"><div class="bloco-t">Viagens de ${mesNome(V.mes)} (saem no holerite)</div>
+      ${r.vs.length?tabelaViagens(r.vs,true)+`<div class="ajuda">${r.viagens} viagem(ns) · ${inteiro(r.km)} km${cargaResumo(r.vs)!=='—'?' · '+cargaResumo(r.vs):''}</div>`:'<div class="muted" style="font-size:13px">Nenhuma viagem lançada neste mês.</div>'}</div>
+    </div></div>`;
 }
 function pdfHolerite(ids){
   if(!window.jspdf){ toast('O gerador de PDF ainda não carregou. Tente de novo em instantes.',true); return; }
@@ -906,11 +909,35 @@ function pdfHolerite(ids){
     y+=2; novaPag(); doc.setFillColor(229,239,245); doc.rect(ML,y-5,MR-ML,11,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(23,36,47); doc.text('Salario liquido',ML+3,y+2.5); doc.text(real(r.liquido),MR-3,y+2.5,{align:'right'}); y+=14;
     if(r.folgas.length){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,110,120); doc.text('Folgas no mes (nao descontam): '+r.folgas.map(l=>brCurto(l.data)).join(', '),ML,y); y+=8; }
-    y=Math.max(y+18,250); if(y>275){ doc.addPage(); y=40; }
+    y+=18; if(y>265){ doc.addPage(); y=40; }
     doc.setDrawColor(23,36,47); doc.setLineWidth(0.4); doc.line(ML,y,ML+70,y); doc.line(MR-70,y,MR,y);
     doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,110,120);
     doc.text('Rodo W',ML,y+5); doc.text(tira(r.m.nome),MR-70,y+5);
-    doc.text('Emitido em '+br(hoje()),PW/2,y+14,{align:'center'});
+    doc.text('Emitido em '+br(hoje()),PW/2,y+14,{align:'center'}); y+=26;
+    // Relação das viagens do mês
+    const X={data:ML, placa:ML+18, rota:ML+42, km:ML+112, carga:ML+140, extra:MR};
+    const cab=()=>{ doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,110,120);
+      doc.text('DATA',X.data,y); doc.text('PLACA',X.placa,y); doc.text('ROTA',X.rota,y); doc.text('KM',X.km,y,{align:'right'}); doc.text('CARGA',X.carga,y,{align:'right'}); doc.text('EXTRA',X.extra,y,{align:'right'});
+      doc.setDrawColor(207,215,221); doc.setLineWidth(0.3); doc.line(ML,y+1.8,MR,y+1.8); y+=6; };
+    if(y>255){ doc.addPage(); y=20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(29,90,122); doc.text('VIAGENS DO MES',ML,y); y+=6;
+    if(!r.vs.length){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(130,140,150); doc.text('Nenhuma viagem lancada no mes',ML,y); }
+    else {
+      cab();
+      r.vs.forEach(v=>{
+        if(y>282){ doc.addPage(); y=20; cab(); }
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(40,50,60);
+        doc.text(brCurto(v.data),X.data,y); doc.text(fmtPlaca(v.placa),X.placa,y);
+        doc.text(doc.splitTextToSize?doc.splitTextToSize(tira(v.rota||''),64)[0]||'':tira(v.rota||'').slice(0,34),X.rota,y);
+        doc.text(inteiro(v.km),X.km,y,{align:'right'}); doc.text(v.carga?inteiro(v.carga)+' '+unidade(v.placa):'',X.carga,y,{align:'right'});
+        doc.text(v.extra?real(v.valorExtra):'',X.extra,y,{align:'right'});
+        doc.setDrawColor(226,231,235); doc.setLineWidth(0.15); doc.line(ML,y+1.8,MR,y+1.8); y+=5.6;
+      });
+      if(y>282){ doc.addPage(); y=20; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(23,36,47);
+      doc.text(r.viagens+' viagem(ns)',X.data,y+1); doc.text(inteiro(r.km),X.km,y+1,{align:'right'});
+      if(r.extras.length) doc.text(real(r.valorExtras),X.extra,y+1,{align:'right'});
+    }
   });
   const nome = ids.length===1 ? 'holerite_'+tira(mot(ids[0]).nome).toLowerCase().replace(/\s+/g,'_')+'_'+ym : 'holerites_'+ym;
   doc.save(nome+'.pdf'); toast('PDF baixado');
