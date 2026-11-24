@@ -1077,7 +1077,7 @@ R.caixa = () => {
   </div>
   <div class="panel">${c.linhas.length?`<div class="tw"><table><thead><tr><th>Dia</th><th>Descrição</th><th class="n hide-m">Valor</th><th class="n">Saldo</th><th class="hide-m">Pago</th><th class="hide-m"></th></tr></thead><tbody>
     <tr><td class="muted">01/${ym.slice(5)}</td><td class="muted">Começo do mês</td><td class="hide-m"></td><td class="n money">${brl(c.inicio)}</td><td class="hide-m"></td><td class="hide-m"></td></tr>
-    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${l.vinc?(l.vinc.tipo==='caminhao'?` ${placaTag(l.vinc.placa)}`:` <span class="tag t-acc">${esc(l.vinc.texto)}</span>`):''}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.ajustado?` <span class="tag t-warn" title="Holerite: ${brl(l.valorHolerite)}">ajustado no caixa</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}${l.obsAjuste?`<div class="muted" style="font-size:12px">${esc(l.obsAjuste)}</div>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
+    ${c.linhas.map(l=>`<tr${l.pago?' style="opacity:.6"':''}><td>${brCurto(l.data)}</td><td style="cursor:pointer" onclick="${l.auto?`abrirAuto('${l.id}')`:`formCaixa('${l.id}')`}">${esc(l.desc)}${vincTags(l)}${l.ref&&!l.auto?` <span class="tag t-mut">ref. ${refTxt(l.ref)}</span>`:''}${clipBtn(l.anexos)}${l.auto?` <span class="tag t-acc">${l.auto==='vale'?'dos vales':l.auto==='comissao'?'comissão':'do fechamento'}</span>`:''}${l.ajustado?` <span class="tag t-warn" title="Holerite: ${brl(l.valorHolerite)}">ajustado no caixa</span>`:''}${l.pago?` <span class="tag t-ok nc">${l.tipo==='entrada'?'recebido':'pago'}</span>`:''}${l.obsAjuste?`<div class="muted" style="font-size:12px">${esc(l.obsAjuste)}</div>`:''}<div class="mob money ${l.tipo==='entrada'?'pos':'neg'}" style="font-size:13px">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</div></td>
       <td class="n money hide-m ${l.tipo==='entrada'?'pos':'neg'}">${l.tipo==='entrada'?'+':'−'}${brl(l.valor)}</td>
       <td class="n money ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td>
       <td class="hide-m"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px"><input type="checkbox" class="chk" ${l.pago?'checked':''} onchange="marcarPago('${l.id}',this.checked)">${l.tipo==='entrada'?'recebido':'pago'}</label></td>
@@ -1086,13 +1086,29 @@ R.caixa = () => {
     :`<div class="vazio">Nenhum lançamento em ${mesNome(ym)}.<br><button class="btn" onclick="formCaixa()">Lançar uma conta a pagar ou a receber</button></div>`}
   </div>
   ${(()=>{ const o=cad.caixa.ocultos||{}, n=caixaAuto(ym,true).filter(l=>o[l.id]).length; return n?`<div class="ajuda" style="margin-top:10px">${n} lançamento(s) automático(s) tirado(s) deste mês. <button class="link" onclick="trazerAutos()">Trazer de volta</button></div>`:''; })()}
-  ${(()=>{ const g={}; c.linhas.filter(l=>l.vinc).forEach(l=>{ const k=l.vinc.tipo==='caminhao'?'C:'+fmtPlaca(l.vinc.placa):'O:'+l.vinc.texto.trim().toLowerCase(); g[k]=g[k]||{nome:l.vinc.tipo==='caminhao'?placaTag(l.vinc.placa):esc(l.vinc.texto), ent:0, sai:0}; g[k][l.tipo==='entrada'?'ent':'sai']+=num(l.valor); });
+  ${(()=>{ const g={}; const add=(k,nome,l)=>{ g[k]=g[k]||{nome, ent:0, sai:0}; g[k][l.tipo==='entrada'?'ent':'sai']+=num(l.valor); };
+    c.linhas.forEach(l=>{ const v=vincDe(l);
+      if(v.placa) add('1:'+fmtPlaca(v.placa), placaTag(v.placa), l);
+      if(v.motoristaId) add('2:'+mot(v.motoristaId).nome, `<span class="pessoa">${av(mot(v.motoristaId))}${esc(mot(v.motoristaId).nome)}</span>`, l);
+      if(v.texto) add('3:'+v.texto.trim().toLowerCase(), esc(v.texto), l); });
     const ks=Object.keys(g).sort(); if(!ks.length) return '';
-    return `<div class="panel"><h2>Por caminhão ou referência</h2><p class="sub">Só os lançamentos do mês com “Referente a” preenchido.</p><div class="tw"><table><thead><tr><th>Referente a</th><th class="n">Entradas</th><th class="n">Saídas</th><th class="n">Resultado</th></tr></thead><tbody>
-      ${ks.map(k=>{ const x=g[k], res=r2(x.ent-x.sai); return `<tr><td>${x.nome}</td><td class="n money pos">${x.ent?brl(x.ent):'—'}</td><td class="n money neg">${x.sai?brl(x.sai):'—'}</td><td class="n money ${res<0?'neg':''}"><b>${brl(res)}</b></td></tr>`; }).join('')}</tbody></table></div></div>`; })()}
+    return `<div class="panel"><h2>Por caminhão, motorista ou referência</h2><p class="sub">Lançamentos do mês ligados a um caminhão, a um motorista (inclui salários, comissões e vales) ou a outra referência. Um lançamento ligado a caminhão e motorista aparece nas duas linhas.</p><div class="tw"><table><thead><tr><th>Referente a</th><th class="n hide-m">Entradas</th><th class="n hide-m">Saídas</th><th class="n">Resultado</th></tr></thead><tbody>
+      ${ks.map(k=>{ const x=g[k], res=r2(x.ent-x.sai); return `<tr><td>${x.nome}</td><td class="n money pos hide-m">${x.ent?brl(x.ent):'—'}</td><td class="n money neg hide-m">${x.sai?brl(x.sai):'—'}</td><td class="n money ${res<0?'neg':''}"><b>${brl(res)}</b></td></tr>`; }).join('')}</tbody></table></div></div>`; })()}
   <div class="ajuda" style="margin-top:10px">Motoristas entram sozinhos: salário base no dia ${cfgCaixa().dia} e viagens extras no dia ${cfgCaixa().diaExtras} ${cfgCaixa().mes==='seguinte'?'do mês seguinte':'do mês'}; cada comissão na data de pagamento escolhida nela; vales no dia em que foram dados. <button class="link" onclick="formConfigCaixa()">Mudar dias</button></div>
   ${C_manual(ym)?`<div class="tools" style="margin-top:12px"><button class="btn sm sec" onclick="copiarCaixa()">Copiar as contas deste mês para ${MESES[+somaMes(ym,1).slice(5)-1]}</button></div>`:''}`;
 };
+/* Vínculo opcional do lançamento do caixa: caminhão, motorista e/ou outra referência (aceita o formato antigo). */
+function vincDe(l){
+  const v=l.vinc||{}; if(v.tipo==='caminhao') return {placa:v.placa}; if(v.tipo==='outro') return {texto:v.texto};
+  const o={...v}; if(l.auto&&l.motoristaId) o.motoristaId=l.motoristaId; return o;
+}
+function vincTags(l){
+  const v=vincDe(l); let h='';
+  if(v.placa) h+=' '+placaTag(v.placa);
+  if(v.motoristaId && !l.auto) h+=` <span class="tag t-mut">${esc(mot(v.motoristaId).nome)}</span>`;
+  if(v.texto) h+=` <span class="tag t-acc">${esc(v.texto)}</span>`;
+  return h;
+}
 const C_manual = ym => cad.caixa.lancs.some(l=>noMes(l.data,ym));
 function formSaldo(){
   const c=caixaMes(V.mes);
@@ -1111,10 +1127,10 @@ function formCaixa(id){
       <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(l.desc)}" placeholder="Ex.: parcela do caminhão, salários, frete da Calp" required></label>
       <label class="field"><span>Dia</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required ${id?'':`onchange="this.form.pago.checked=this.value.slice(0,7)<mesAtual()"`}></label>
       <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}" required></label>
-      <label class="field"><span>Referente a (opcional)</span><select class="inp" name="vinc" onchange="this.form.vincTxt.parentNode.style.display=this.value==='outro'?'':'none'">
-        <option value="">—</option>${optsPlaca(l.vinc&&l.vinc.tipo==='caminhao'?l.vinc.placa:'').replace('<optgroup label="Ração">','<optgroup label="Caminhão · Ração">').replace('<optgroup label="Leite">','<optgroup label="Caminhão · Leite">')}
-        <option value="outro" ${l.vinc&&l.vinc.tipo==='outro'?'selected':''}>Outra coisa…</option></select></label>
-      <label class="field" style="${l.vinc&&l.vinc.tipo==='outro'?'':'display:none'}"><span>Qual?</span><input class="inp" name="vincTxt" value="${esc(l.vinc&&l.vinc.tipo==='outro'?l.vinc.texto:'')}" placeholder="Ex.: fazenda, cooperativa, aluguel"></label>
+      ${(()=>{ const v=vincDe(l); return `
+      <label class="field"><span>Caminhão (opcional)</span><select class="inp" name="vPlaca"><option value="">—</option>${optsPlaca(v.placa||'')}</select></label>
+      <label class="field"><span>Motorista (opcional)</span><select class="inp" name="vMot"><option value="">—</option>${optsMot(v.motoristaId||'')}</select></label>
+      <label class="field full"><span>Outra referência (opcional)</span><input class="inp" name="vTxt" value="${esc(v.texto||'')}" placeholder="Ex.: fazenda, cooperativa, aluguel"></label>`; })()}
       <label class="field full"><span>Mês de referência (opcional)</span><input class="inp" type="month" name="ref" value="${esc(l.ref||'')}"><span class="ajuda" style="display:block;font-weight:400">Ex.: pagamento feito em novembro referente ao trabalho de outubro.</span></label>
     </div>
     <label class="toggle"><input type="checkbox" name="pago" ${l.pago?'checked':''}> Já foi pago / recebido</label>
@@ -1122,9 +1138,8 @@ function formCaixa(id){
     ${campoAnexos(l.anexos)}`,
     extra:id?`<button type="button" class="btn danger" style="margin-right:auto" onclick="apagarCaixa('${id}')">${I.lixo}Apagar</button>`:'',
     aoConfirmar:async f=>{
-      const vv=f.vinc.value, vinc=!vv?null:vv==='outro'?{tipo:'outro', texto:f.vincTxt.value.trim()}:{tipo:'caminhao', placa:fmtPlaca(vv)};
-      if(vinc&&vinc.tipo==='outro'&&!vinc.texto){ toast('Escreva a que se refere.',true); return false; }
-      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||'', vinc};
+      const vinc={}; if(f.vPlaca.value) vinc.placa=fmtPlaca(f.vPlaca.value); if(f.vMot.value) vinc.motoristaId=f.vMot.value; if(f.vTxt.value.trim()) vinc.texto=f.vTxt.value.trim();
+      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||'', vinc:Object.keys(vinc).length?vinc:null};
       if(!o.desc||!o.data){ toast('Preencha a descrição e o dia.',true); return false; }
       if(o.valor<=0){ toast('Informe o valor.',true); return false; }
       try{ o.anexos=await salvarAnexos('caixa'); }catch(e){ return false; }
@@ -1208,6 +1223,7 @@ R.manutencao = () => {
   const lista=(V.gPlaca?gastos.filter(g=>normPlaca(g.placa)===normPlaca(V.gPlaca)):gm).sort((a,b)=>b.data.localeCompare(a.data));
   const meses=[0,-1,-2,-3,-4,-5].map(n=>somaMes(ym,n)).reverse();
   const placas=cad.caminhoes.filter(c=>c.ativo!==false||gastos.some(g=>normPlaca(g.placa)===normPlaca(c.placa)));
+  if(gastos.some(g=>!normPlaca(g.placa))) placas.push({placa:'', semPlaca:true});
   const tot=(p,m)=>soma(gastos.filter(g=>normPlaca(g.placa)===normPlaca(p)&&noMes(g.data,m)),g=>g.valor);
   const porTipo=TIPOS_GASTO.map(t=>[t,soma(gm.filter(g=>g.tipo===t),g=>g.valor)]).filter(x=>x[1]);
   return `
@@ -1219,13 +1235,13 @@ R.manutencao = () => {
   </div>
   <div class="panel"><div class="panel-h"><div><h2>Total por caminhão</h2><p class="sub">Últimos 6 meses. Toque numa placa para ver o histórico completo dela.</p></div></div>
     <div class="tw"><table><thead><tr><th>Placa</th>${meses.map(m=>`<th class="n ${m===ym?'':'hide-m'}">${MESES[+m.slice(5)-1].slice(0,3)}/${m.slice(2,4)}</th>`).join('')}<th class="n">6 meses</th></tr></thead><tbody>
-    ${placas.map(c=>`<tr style="cursor:pointer" onclick="V.gPlaca='${esc(c.placa)}';render()"><td>${placaTag(c.placa)}</td>${meses.map(m=>{const v=tot(c.placa,m);return `<td class="n ${m===ym?'':'hide-m'}">${v?brl(v):'<span class="muted">—</span>'}</td>`;}).join('')}<td class="n money"><b>${brl(soma(meses,m=>tot(c.placa,m)))}</b></td></tr>`).join('')}
+    ${placas.map(c=>`<tr ${c.semPlaca?'':`style="cursor:pointer" onclick="V.gPlaca='${esc(c.placa)}';render()"`}><td>${c.semPlaca?'<span class="muted">Sem caminhão</span>':placaTag(c.placa)}</td>${meses.map(m=>{const v=tot(c.placa,m);return `<td class="n ${m===ym?'':'hide-m'}">${v?brl(v):'<span class="muted">—</span>'}</td>`;}).join('')}<td class="n money"><b>${brl(soma(meses,m=>tot(c.placa,m)))}</b></td></tr>`).join('')}
     </tbody><tfoot><tr><td>Total</td>${meses.map(m=>`<td class="n ${m===ym?'':'hide-m'}">${brl(soma(placas,c=>tot(c.placa,m)))}</td>`).join('')}<td class="n money">${brl(soma(placas,c=>soma(meses,m=>tot(c.placa,m))))}</td></tr></tfoot></table></div>
   </div>
   <div class="panel"><div class="panel-h"><div><h2>${V.gPlaca?'Histórico do '+esc(fmtPlaca(V.gPlaca)):'Gastos de '+mesNome(ym)}</h2><p class="sub">${V.gPlaca?'Todos os gastos desta placa, do mais recente para o mais antigo.':'Lançamentos do mês.'}</p></div>
     <select class="inp" style="width:auto" onchange="V.gPlaca=this.value;render()" aria-label="Filtrar por caminhão">${optsPlaca(V.gPlaca,'Mês selecionado (todas as placas)')}</select></div>
     ${lista.length?`<div class="tw"><table><thead><tr><th>Data</th><th>Placa</th><th>Tipo</th><th class="hide-m">Descrição</th><th class="hide-m">Oficina</th><th class="n hide-m">Km</th><th class="n">Valor</th><th></th></tr></thead><tbody>
-    ${lista.map(g=>`<tr><td>${br(g.data)}</td><td>${placaTag(g.placa)}</td><td><span class="tag t-acc">${esc(g.tipo)}</span></td><td class="hide-m">${esc(g.desc||'')}</td><td class="hide-m">${esc(g.oficina||'')}</td><td class="n hide-m">${g.km?inteiro(g.km):''}</td><td class="n money">${brl(g.valor)}</td>
+    ${lista.map(g=>`<tr><td>${br(g.data)}</td><td>${placaTag(g.placa)}</td><td><span class="tag t-acc">${esc(g.tipo)}</span></td><td class="hide-m">${esc(g.desc||'')}${g.motoristaId?`<div class="muted" style="font-size:12px">${esc(mot(g.motoristaId).nome)}</div>`:''}</td><td class="hide-m">${esc(g.oficina||'')}</td><td class="n hide-m">${g.km?inteiro(g.km):''}</td><td class="n money">${brl(g.valor)}</td>
       <td class="act">${clipBtn(g.anexos)}${g.fotoId?`<button class="icon-btn" title="Ver nota" onclick="verFoto('${g.fotoId}')">${I.foto}</button>`:''}<button class="icon-btn" title="Editar" onclick="formGasto('${g.id}')">${I.editar}</button><button class="icon-btn" title="Apagar" onclick="apagarGasto('${g.id}')">${I.lixo}</button></td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="6" class="hide-m">Total</td><td class="nc" colspan="3">Total</td><td class="n money">${brl(soma(lista,g=>g.valor))}</td><td></td></tr></tfoot></table></div>`
     :`<div class="vazio">Nenhum gasto ${V.gPlaca?'nesta placa':'neste mês'}.<br><button class="btn" onclick="formGasto()">Lançar gasto</button></div>`}
@@ -1238,7 +1254,8 @@ function formGasto(id){
   abrirModal({titulo:id?'Editar gasto':'Novo gasto de manutenção', larg:'600px',
     corpo:`<div class="fg">
       <label class="field"><span>Data</span><input class="inp" type="date" name="data" value="${esc(g.data)}" required></label>
-      <label class="field"><span>Caminhão</span><select class="inp" name="placa" required><option value="">Escolha…</option>${optsPlaca(g.placa)}</select></label>
+      <label class="field"><span>Caminhão (opcional)</span><select class="inp" name="placa"><option value="">— nenhum —</option>${optsPlaca(g.placa)}</select></label>
+      <label class="field"><span>Motorista (opcional)</span><select class="inp" name="mot"><option value="">—</option>${optsMot(g.motoristaId||'')}</select></label>
       <label class="field"><span>Tipo</span><select class="inp" name="tipo">${TIPOS_GASTO.map(t=>`<option ${g.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
       <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(g.valor)}" required></label>
       <label class="field full"><span>Descrição</span><input class="inp" name="desc" value="${esc(g.desc||'')}" placeholder="Ex.: troca de 2 pneus dianteiros"></label>
@@ -1247,8 +1264,8 @@ function formGasto(id){
     </div>${g.fotoId?`<div class="anx">${I.foto}<span class="nm">Foto da nota (enviada antes)</span><button type="button" class="link" onclick="verFoto('${g.fotoId}')">Abrir</button></div>`:''}
     ${campoAnexos(g.anexos)}`,
     aoConfirmar:async f=>{
-      const o={...g, data:f.data.value, placa:fmtPlaca(f.placa.value), tipo:f.tipo.value, valor:num(f.valor.value), desc:f.desc.value.trim(), oficina:f.oficina.value.trim(), km:int(f.km.value)};
-      if(!o.data||!o.placa){ toast('Preencha a data e o caminhão.',true); return false; }
+      const o={...g, data:f.data.value, placa:fmtPlaca(f.placa.value), motoristaId:f.mot.value||'', tipo:f.tipo.value, valor:num(f.valor.value), desc:f.desc.value.trim(), oficina:f.oficina.value.trim(), km:int(f.km.value)};
+      if(!o.data){ toast('Preencha a data.',true); return false; }
       if(o.valor<=0){ toast('Informe o valor.',true); return false; }
       try{ o.anexos=await salvarAnexos('manutencao'); }catch(e){ return false; }
       if(!id) o.criado=Date.now();
