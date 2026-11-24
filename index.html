@@ -157,6 +157,7 @@ td.act{text-align:right;white-space:nowrap}
 .prev tr.off td{opacity:.45}
 .fotoprev{max-width:100%;max-height:260px;border-radius:var(--r-m);border:1px solid var(--line);display:block;margin-top:8px}
 .fotogrande{width:100%;border-radius:var(--r-m)}
+.rateio{display:grid;grid-template-columns:1fr 130px 32px;gap:8px;align-items:center;margin-top:6px}
 .anx{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-m);margin-top:6px;font-size:14px}
 .anx .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .anx .muted{font-size:12px;white-space:nowrap}
@@ -1088,7 +1089,8 @@ R.caixa = () => {
   ${(()=>{ const o=cad.caixa.ocultos||{}, n=caixaAuto(ym,true).filter(l=>o[l.id]).length; return n?`<div class="ajuda" style="margin-top:10px">${n} lançamento(s) automático(s) tirado(s) deste mês. <button class="link" onclick="trazerAutos()">Trazer de volta</button></div>`:''; })()}
   ${(()=>{ const g={}; const add=(k,nome,l)=>{ g[k]=g[k]||{nome, ent:0, sai:0}; g[k][l.tipo==='entrada'?'ent':'sai']+=num(l.valor); };
     c.linhas.forEach(l=>{ const v=vincDe(l);
-      if(v.placa) add('1:'+fmtPlaca(v.placa), placaTag(v.placa), l);
+      if((l.rateio||[]).length) l.rateio.forEach(r=>add('1:'+fmtPlaca(r.placa), placaTag(r.placa), {...l, valor:r.valor}));
+      else if(v.placa) add('1:'+fmtPlaca(v.placa), placaTag(v.placa), l);
       if(v.motoristaId) add('2:'+mot(v.motoristaId).nome, `<span class="pessoa">${av(mot(v.motoristaId))}${esc(mot(v.motoristaId).nome)}</span>`, l);
       if(v.texto) add('3:'+v.texto.trim().toLowerCase(), esc(v.texto), l); });
     const ks=Object.keys(g).sort(); if(!ks.length) return '';
@@ -1104,7 +1106,8 @@ function vincDe(l){
 }
 function vincTags(l){
   const v=vincDe(l); let h='';
-  if(v.placa) h+=' '+placaTag(v.placa);
+  if((l.rateio||[]).length) h+=`<div class="muted" style="font-size:12px;margin-top:2px">Dividido: ${l.rateio.map(r=>`${placaTag(r.placa)} ${brl(r.valor)}`).join(' · ')}</div>`;
+  else if(v.placa) h+=' '+placaTag(v.placa);
   if(v.motoristaId && !l.auto) h+=` <span class="tag t-mut">${esc(mot(v.motoristaId).nome)}</span>`;
   if(v.texto) h+=` <span class="tag t-acc">${esc(v.texto)}</span>`;
   return h;
@@ -1128,8 +1131,10 @@ function formCaixa(id){
       <label class="field"><span>Dia</span><input class="inp" type="date" name="data" value="${esc(l.data)}" required ${id?'':`onchange="this.form.pago.checked=this.value.slice(0,7)<mesAtual()"`}></label>
       <label class="field"><span>Valor (R$)</span><input class="inp num" name="valor" inputmode="decimal" value="${fmtInp(l.valor)}" required></label>
       ${(()=>{ const v=vincDe(l); return `
-      <label class="field"><span>Caminhão (opcional)</span><select class="inp" name="vPlaca"><option value="">—</option>${optsPlaca(v.placa||'')}</select></label>
+      <div class="field" id="cxUmCam" style="${(l.rateio||[]).length?'display:none':''}"><span style="display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:6px">Caminhão (opcional)</span><select class="inp" name="vPlaca"><option value="">—</option>${optsPlaca(v.placa||'')}</select>
+        <button type="button" class="link" style="margin-top:6px;font-size:13px" onclick="iniciarRateio()">Dividir entre vários caminhões</button></div>
       <label class="field"><span>Motorista (opcional)</span><select class="inp" name="vMot"><option value="">—</option>${optsMot(v.motoristaId||'')}</select></label>
+      <div class="field full" id="cxRateio"></div>
       <label class="field full"><span>Outra referência (opcional)</span><input class="inp" name="vTxt" value="${esc(v.texto||'')}" placeholder="Ex.: fazenda, cooperativa, aluguel"></label>`; })()}
       <label class="field full"><span>Mês de referência (opcional)</span><input class="inp" type="month" name="ref" value="${esc(l.ref||'')}"><span class="ajuda" style="display:block;font-weight:400">Ex.: pagamento feito em novembro referente ao trabalho de outubro.</span></label>
     </div>
@@ -1138,8 +1143,16 @@ function formCaixa(id){
     ${campoAnexos(l.anexos)}`,
     extra:id?`<button type="button" class="btn danger" style="margin-right:auto" onclick="apagarCaixa('${id}')">${I.lixo}Apagar</button>`:'',
     aoConfirmar:async f=>{
+      const rat=RATEIO.filter(r=>r.placa||num(r.valor));
+      if(rat.length){
+        if(rat.some(r=>!r.placa||num(r.valor)<=0)){ toast('Em cada linha da divisão, escolha o caminhão e o valor.',true); return false; }
+        if(new Set(rat.map(r=>normPlaca(r.placa))).size<rat.length){ toast('O mesmo caminhão aparece duas vezes na divisão.',true); return false; }
+        const dif=r2(num(f.valor.value)-soma(rat,r=>num(r.valor)));
+        if(Math.abs(dif)>0.009){ toast(`A divisão soma ${brl(soma(rat,r=>num(r.valor)))}, mas o valor é ${brl(num(f.valor.value))}. ${dif>0?'Faltam':'Sobram'} ${brl(Math.abs(dif))}.`,true); return false; }
+        f.vPlaca.value='';
+      }
       const vinc={}; if(f.vPlaca.value) vinc.placa=fmtPlaca(f.vPlaca.value); if(f.vMot.value) vinc.motoristaId=f.vMot.value; if(f.vTxt.value.trim()) vinc.texto=f.vTxt.value.trim();
-      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||'', vinc:Object.keys(vinc).length?vinc:null};
+      const o={tipo:f.tipo.value, desc:f.desc.value.trim(), data:f.data.value, valor:num(f.valor.value), pago:f.pago.checked, ref:f.ref.value||'', vinc:Object.keys(vinc).length?vinc:null, rateio:rat.map(r=>({placa:fmtPlaca(r.placa), valor:r2(num(r.valor))}))};
       if(!o.desc||!o.data){ toast('Preencha a descrição e o dia.',true); return false; }
       if(o.valor<=0){ toast('Informe o valor.',true); return false; }
       try{ o.anexos=await salvarAnexos('caixa'); }catch(e){ return false; }
@@ -1148,6 +1161,30 @@ function formCaixa(id){
       if(!noMes(o.data,V.mes)){ V.mes=o.data.slice(0,7); toast('Lançado em '+mesNome(V.mes)); }
       else toast(id?'Lançamento atualizado':'Lançamento salvo');
     }});
+  RATEIO=JSON.parse(JSON.stringify(l.rateio||[])); desenharRateio();
+  const fv=$('mform').valor; fv.addEventListener('input',somaRateio);
+}
+let RATEIO=[];
+function iniciarRateio(){
+  const f=$('mform'); const p=f.vPlaca.value;
+  RATEIO=[{placa:p, valor:p?num(f.valor.value):''},{placa:'',valor:''}];
+  $('cxUmCam').style.display='none'; desenharRateio();
+}
+function desenharRateio(){
+  const el=$('cxRateio'); if(!el) return;
+  if(!RATEIO.length){ el.innerHTML=''; if($('cxUmCam')) $('cxUmCam').style.display=''; return; }
+  el.innerHTML=`<span style="display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:6px">Dividir entre caminhões</span>
+    ${RATEIO.map((r,i)=>`<div class="rateio"><select class="inp" onchange="RATEIO[${i}].placa=this.value"><option value="">Caminhão…</option>${optsPlaca(r.placa)}</select>
+      <input class="inp num" inputmode="decimal" placeholder="R$" value="${fmtInp(r.valor)}" oninput="RATEIO[${i}].valor=this.value;somaRateio()">
+      <button type="button" class="icon-btn" title="Tirar" onclick="RATEIO.splice(${i},1);desenharRateio()">${I.x}</button></div>`).join('')}
+    <div class="tools" style="margin-top:6px"><button type="button" class="btn sm sec" onclick="RATEIO.push({placa:'',valor:''});desenharRateio()">${I.lancar}Mais um caminhão</button><button type="button" class="btn sm ghost" onclick="RATEIO=[];desenharRateio()">Não dividir</button></div>
+    <div class="ajuda" id="rateioSoma"></div>`;
+  somaRateio();
+}
+function somaRateio(){
+  const el=$('rateioSoma'), f=$('mform'); if(!el||!f) return;
+  const tot=r2(soma(RATEIO,r=>num(r.valor))), v=num(f.valor.value), dif=r2(v-tot);
+  el.innerHTML=`Dividido: <b>${brl(tot)}</b> de ${brl(v)}${Math.abs(dif)>0.009?` · <span class="${dif>0?'':'neg'}" style="font-weight:700">${dif>0?'faltam':'sobram'} ${brl(Math.abs(dif))}</span>`:' · <span class="pos" style="font-weight:700">certo</span>'}`;
 }
 function marcarPago(id,on){
   if(/^(sal|ext|com|vale):/.test(id)){ cad.caixa.pagosAuto=cad.caixa.pagosAuto||{}; cad.caixa.pagosAuto[id]=on; salvar(); render(); return; }
@@ -1213,7 +1250,7 @@ function copiarCaixa(){
   const de=V.mes, para=somaMes(de,1), ls=cad.caixa.lancs.filter(l=>noMes(l.data,de));
   const [y,m]=para.split('-').map(Number), ult=new Date(y,m,0).getDate();
   confirmar(`Copiar ${ls.length} lançamento(s) para ${mesNome(para)}?`, 'Mesma descrição, mesmo dia e mesmo valor, ainda não pagos. Depois é só ajustar o que mudou.', 'Copiar', ()=>{
-    ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, vinc:l.vinc||null, data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
+    ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, vinc:l.vinc||null, rateio:l.rateio||[], data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
     salvar(); V.mes=para; toast(`${ls.length} lançamento(s) copiados para ${mesNome(para)}`);
   });
 }
