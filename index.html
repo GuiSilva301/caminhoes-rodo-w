@@ -157,6 +157,11 @@ td.act{text-align:right;white-space:nowrap}
 .prev tr.off td{opacity:.45}
 .fotoprev{max-width:100%;max-height:260px;border-radius:var(--r-m);border:1px solid var(--line);display:block;margin-top:8px}
 .fotogrande{width:100%;border-radius:var(--r-m)}
+.relgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.relcard{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.relcard b{font-size:14px}.relcard span{font-size:12px;color:var(--ink3);line-height:1.35}
+.relcard:hover{border-color:var(--line2)}.relcard.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--accbg);background:var(--accbg)}
+.rlab{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink2)}
 .rateio{display:grid;grid-template-columns:1fr 130px 32px;gap:8px;align-items:center;margin-top:6px}
 .anx{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-m);margin-top:6px;font-size:14px}
 .anx .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
@@ -233,6 +238,7 @@ td.act{text-align:right;white-space:nowrap}
   .nf{display:none} .nc{display:inline} td.nc{display:table-cell} .mob{display:block} .tag.nc{display:inline-block}
   #modal{padding:16px 8px}
   .benrow{grid-template-columns:1fr 1fr}
+  .relgrid{grid-template-columns:1fr 1fr}.relcard span{display:none}
   .benrow .icon-btn{grid-column:1/-1;justify-self:end}
   #modal .box{padding:18px}
 }
@@ -377,6 +383,7 @@ const I = {
   caminhoes:'<svg class="i" viewBox="0 0 24 24"><path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
   caixa:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg>',
   clip:'<svg class="i" viewBox="0 0 24 24"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/></svg>',
+  relatorio:'<svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   conta:'<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>',
   mais:'<svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
   esq:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
@@ -506,12 +513,13 @@ const PAGS = [
   {id:'motoristas', nome:'Vales, faltas e folgas', i:'motoristas'},
   {id:'fechamento', nome:'Fechamento do mês', i:'fechamento'},
   {id:'caixa', nome:'Fluxo de caixa', i:'caixa'},
+  {id:'relatorios', nome:'Relatórios', i:'relatorio'},
   {id:'manutencao', nome:'Manutenção', i:'manutencao'},
   {g:'Cadastros'},
   {id:'cadastros', nome:'Motoristas e caminhões', i:'caminhoes'},
   {id:'conta', nome:'Minha conta', i:'conta'}
 ];
-const MAIS_IDS=['caixa','motoristas','manutencao','cadastros','conta'];
+const MAIS_IDS=['caixa','relatorios','motoristas','manutencao','cadastros','conta'];
 let pag='inicio';
 const V = { mes: mesAtual(), fMot:'', fPlaca:'', lMot:'', gPlaca:'', abertos:{} };
 function ir(p, opts){ pag=p; if(opts) Object.assign(V,opts); fecharMais(); history.replaceState(null,'','#'+p); window.scrollTo(0,0); render(); }
@@ -1253,6 +1261,163 @@ function copiarCaixa(){
     ls.forEach((l,i)=>cad.caixa.lancs.push({id:uid()+i, criado:Date.now()+i, tipo:l.tipo, desc:l.desc, valor:l.valor, pago:false, vinc:l.vinc||null, rateio:l.rateio||[], data:para+'-'+pad(Math.min(+l.data.slice(8),ult))}));
     salvar(); V.mes=para; toast(`${ls.length} lançamento(s) copiados para ${mesNome(para)}`);
   });
+}
+
+/* ============================ RELATÓRIOS ============================
+   Cada relatório devolve {titulo, sub, cols:[{t, tipo:'txt'|'brl'|'int'|'num'}], linhas:[[...]], total:[...]|null}
+   e a mesma estrutura vira tabela na tela, PDF e planilha (CSV para Excel).
+   =================================================================== */
+const REL_TIPOS = [
+  {id:'caminhao', nome:'Gastos e receitas por caminhão', desc:'Manutenção, gastos e receitas do caixa ligados a cada caminhão (inclui gastos divididos) e viagens/km.', filtro:'placa'},
+  {id:'motorista', nome:'Pagamentos por motorista', desc:'O que saiu do caixa para cada motorista: salário, comissões, viagens extras, vales e outros gastos ligados a ele.', filtro:'mot'},
+  {id:'salarios', nome:'Salários (holerites)', desc:'Fechamento de cada mês: fixo, extras, comissões, receitas, descontos e líquido de cada motorista.', filtro:'mot'},
+  {id:'vales', nome:'Vales (adiantamentos)', desc:'Todos os vales do período, com o total de cada motorista.', filtro:'mot'},
+  {id:'manutencao', nome:'Manutenções (lista)', desc:'Cada gasto de manutenção: data, caminhão, tipo, oficina e valor.', filtro:'placa'},
+  {id:'manutPlaca', nome:'Manutenção por caminhão e tipo', desc:'Total de manutenção de cada caminhão separado por tipo (pneu, óleo, mecânica…).', filtro:'placa'},
+  {id:'viagens', nome:'Viagens por motorista e caminhão', desc:'Quantidade de viagens, km rodados, carga e viagens extras.', filtro:'ambos'},
+  {id:'caixa', nome:'Fluxo de caixa mês a mês', desc:'Saldo inicial, entradas, saídas e saldo final de cada mês.', filtro:''}
+];
+const REL = { tipo:'caminhao', de:'', ate:'', mot:'', placa:'', dados:null };
+function mesesEntre(de, ate){ const out=[]; let m=de; while(m<=ate && out.length<60){ out.push(m); m=somaMes(m,1); } return out; }
+const naFaixa = (d,de,ate) => { const m=String(d||'').slice(0,7); return m>=de && m<=ate; };
+R.relatorios = () => {
+  if(!REL.de){ REL.ate=mesAtual(); REL.de=somaMes(REL.ate,-2); }
+  const T=REL_TIPOS.find(t=>t.id===REL.tipo);
+  return `
+  <div class="head"><div><h1>Relatórios</h1><p>Escolha o relatório e o período. Dá para baixar em PDF ou em planilha (abre no Excel).</p></div></div>
+  <div class="relgrid">${REL_TIPOS.map(t=>`<button class="relcard ${t.id===REL.tipo?'on':''}" onclick="REL.tipo='${t.id}';REL.dados=null;render()"><b>${t.nome}</b><span>${t.desc}</span></button>`).join('')}</div>
+  <div class="panel" style="margin-top:16px">
+    <div class="tools">
+      <label class="rlab">De <input class="inp" type="month" value="${REL.de}" onchange="REL.de=this.value;REL.dados=null;render()"></label>
+      <label class="rlab">Até <input class="inp" type="month" value="${REL.ate}" onchange="REL.ate=this.value;REL.dados=null;render()"></label>
+      ${T.filtro==='mot'||T.filtro==='ambos'?`<select class="inp" onchange="REL.mot=this.value;REL.dados=null;render()">${optsMot(REL.mot,'Todos os motoristas')}</select>`:''}
+      ${T.filtro==='placa'||T.filtro==='ambos'?`<select class="inp" onchange="REL.placa=this.value;REL.dados=null;render()">${optsPlaca(REL.placa,'Todos os caminhões')}</select>`:''}
+      <span class="tools" style="margin-left:auto"><button class="btn sm sec" onclick="relPeriodo('mes')">Este mês</button><button class="btn sm sec" onclick="relPeriodo('3')">3 meses</button><button class="btn sm sec" onclick="relPeriodo('ano')">Este ano</button></span>
+    </div>
+  </div>
+  ${relCorpo()}`;
+};
+function relPeriodo(q){ const m=mesAtual(); REL.ate=m; REL.de=q==='mes'?m:q==='3'?somaMes(m,-2):m.slice(0,4)+'-01'; REL.dados=null; render(); }
+function relCorpo(){
+  if(REL.de>REL.ate) return `<div class="aviso">O mês “de” está depois do “até”.</div>`;
+  const r=gerarRelatorio(); REL.dados=r;
+  if(!r.linhas.length) return `<div class="panel"><h2>${esc(r.titulo)}</h2><p class="sub">${esc(r.sub)}</p><div class="vazio">Nada encontrado nesse período${REL.mot||REL.placa?' com esse filtro':''}.</div></div>`;
+  const cel=(v,c)=>c.tipo==='brl'?`<td class="n money ${v<0?'neg':''}">${brl(v)}</td>`:c.tipo==='int'?`<td class="n">${inteiro(v)}</td>`:c.tipo==='num'?`<td class="n">${dec(v)}</td>`:`<td>${esc(v)}</td>`;
+  return `<div class="panel"><div class="panel-h"><div><h2>${esc(r.titulo)}</h2><p class="sub">${esc(r.sub)}</p></div>
+    <div class="tools"><button class="btn sm sec" onclick="relPlanilha()">${I.pdf}Planilha</button><button class="btn sm" onclick="relPDF()">${I.pdf}PDF</button></div></div>
+    <div class="tw"><table><thead><tr>${r.cols.map(c=>`<th class="${c.tipo!=='txt'?'n':''}">${c.t}</th>`).join('')}</tr></thead>
+    <tbody>${r.linhas.map(l=>`<tr>${l.map((v,i)=>cel(v,r.cols[i])).join('')}</tr>`).join('')}</tbody>
+    ${r.total?`<tfoot><tr>${r.total.map((v,i)=>v===null||v===''?'<td></td>':r.cols[i].tipo==='txt'?`<td>${esc(v)}</td>`:cel(v,r.cols[i]).replace('<td','<td style="font-weight:700"')).join('')}</tr></tfoot>`:''}</table></div>
+    ${r.nota?`<div class="ajuda" style="margin-top:10px">${esc(r.nota)}</div>`:''}</div>`;
+}
+const dec = v => (Number(v)||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+const nomePl = p => fmtPlaca(p);
+function somaColunas(linhas, cols){ return cols.map((c,i)=>i===0?'Total':c.tipo==='txt'?'':r2(soma(linhas,l=>l[i]))); }
+function linhasCaixaPeriodo(){ return mesesEntre(REL.de,REL.ate).flatMap(m=>caixaMes(m).linhas); }
+function gerarRelatorio(){
+  const de=REL.de, ate=REL.ate, per=de===ate?mesNome(de):`${mesNome(de)} a ${mesNome(ate)}`;
+  const fMot=REL.mot, fPl=REL.placa, filtroTxt=[fMot?'Motorista: '+mot(fMot).nome:'', fPl?'Caminhão: '+fmtPlaca(fPl):''].filter(Boolean).join(' · ');
+  const sub=per+(filtroTxt?' · '+filtroTxt:'');
+  const T=REL_TIPOS.find(t=>t.id===REL.tipo);
+  if(REL.tipo==='caminhao'){
+    const cols=[{t:'Caminhão',tipo:'txt'},{t:'Viagens',tipo:'int'},{t:'Km',tipo:'int'},{t:'Receitas (caixa)',tipo:'brl'},{t:'Manutenção',tipo:'brl'},{t:'Outros gastos (caixa)',tipo:'brl'},{t:'Resultado',tipo:'brl'}];
+    const cx=linhasCaixaPeriodo(), placas=cad.caminhoes.filter(c=>!fPl||normPlaca(c.placa)===normPlaca(fPl));
+    const linhas=placas.map(c=>{ const p=normPlaca(c.placa);
+      const vs=viagens.filter(v=>normPlaca(v.placa)===p&&naFaixa(v.data,de,ate));
+      const man=soma(gastos.filter(g=>normPlaca(g.placa)===p&&naFaixa(g.data,de,ate)),g=>g.valor);
+      let rec=0, out=0;
+      cx.forEach(l=>{ const parte=(l.rateio||[]).length?soma(l.rateio.filter(r=>normPlaca(r.placa)===p),r=>r.valor):(normPlaca(vincDe(l).placa||'')===p?num(l.valor):0); if(!parte) return; if(l.tipo==='entrada') rec+=parte; else out+=parte; });
+      return [c.placa+' ('+tipoNome(c.tipo)+')', vs.length, soma(vs,v=>v.km), r2(rec), r2(man), r2(out), r2(rec-man-out)]; }).filter(l=>l[1]||l[3]||l[4]||l[5]);
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?somaColunas(linhas,cols):null,
+      nota:'Manutenção vem da aba Manutenção; receitas e outros gastos vêm do fluxo de caixa (lançamentos ligados ao caminhão, inclusive a parte de cada um nos gastos divididos). Se um mesmo gasto foi lançado nas duas abas, ele aparece duas vezes.'};
+  }
+  if(REL.tipo==='motorista'){
+    const cols=[{t:'Motorista',tipo:'txt'},{t:'Salário',tipo:'brl'},{t:'Comissões',tipo:'brl'},{t:'Viagens extras',tipo:'brl'},{t:'Vales',tipo:'brl'},{t:'Outros gastos ligados',tipo:'brl'},{t:'Total pago',tipo:'brl'}];
+    const cx=linhasCaixaPeriodo().filter(l=>l.tipo!=='entrada');
+    const linhas=cad.motoristas.filter(m=>!fMot||m.id===fMot).map(m=>{
+      const de_=cx.filter(l=>vincDe(l).motoristaId===m.id), s=a=>r2(soma(de_.filter(l=>l.auto===a),l=>l.valor));
+      const sal=s('salario'), com=s('comissao'), ext=s('extras'), val=s('vale'), out=r2(soma(de_.filter(l=>!l.auto),l=>l.valor));
+      return [m.nome, sal, com, ext, val, out, r2(sal+com+ext+val+out)]; }).filter(l=>l[6]);
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?somaColunas(linhas,cols):null, nota:'Pelo dia em que o dinheiro saiu do caixa (salário de outubro pago em novembro conta em novembro). Valores ajustados direto no caixa entram com o valor ajustado.'};
+  }
+  if(REL.tipo==='salarios'){
+    const cols=[{t:'Mês',tipo:'txt'},{t:'Motorista',tipo:'txt'},{t:'Fixo',tipo:'brl'},{t:'Viagens extras',tipo:'brl'},{t:'Comissões',tipo:'brl'},{t:'Receitas',tipo:'brl'},{t:'Vales',tipo:'brl'},{t:'Faltas e descontos',tipo:'brl'},{t:'Líquido',tipo:'brl'}];
+    const linhas=[];
+    mesesEntre(de,ate).forEach(m=>ativosNoMes(m).filter(x=>!fMot||x.id===fMot).forEach(x=>{ const r=calcMes(x.id,m); if(!r.bruto&&!r.totDesc) return;
+      linhas.push([refTxt(m), x.nome, r.fixo, r.valorExtras, r.totComissoes, r.totReceitas, r.totVales, r2(r.totFaltas+r.totDescontos), r.liquido]); }));
+    const tot=cols.map((c,i)=>i===0?'Total':i===1?'':r2(soma(linhas,l=>l[i])));
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?tot:null, nota:'Pelo mês trabalhado (competência), igual ao holerite. Receitas incluem benefícios de todo mês.'};
+  }
+  if(REL.tipo==='vales'){
+    const cols=[{t:'Data',tipo:'txt'},{t:'Motorista',tipo:'txt'},{t:'Holerite',tipo:'txt'},{t:'Observação',tipo:'txt'},{t:'Valor',tipo:'brl'}];
+    const ls=cad.lancs.filter(l=>l.tipo==='vale'&&naFaixa(l.data,de,ate)&&(!fMot||l.motoristaId===fMot)).sort((a,b)=>a.data.localeCompare(b.data)||tempo(a)-tempo(b));
+    const linhas=ls.map(l=>[br(l.data), mot(l.motoristaId).nome, refTxt(mesRef(l)), l.desc||'', num(l.valor)]);
+    const porMot={}; ls.forEach(l=>{ porMot[mot(l.motoristaId).nome]=(porMot[mot(l.motoristaId).nome]||0)+num(l.valor); });
+    return {titulo:T.nome, sub, cols, linhas, total:['Total','','','',r2(soma(ls,l=>l.valor))],
+      nota:Object.keys(porMot).length>1?'Por motorista: '+Object.entries(porMot).sort((a,b)=>b[1]-a[1]).map(([n,v])=>n+' '+brl(v)).join(' · '):''};
+  }
+  if(REL.tipo==='manutencao'){
+    const cols=[{t:'Data',tipo:'txt'},{t:'Caminhão',tipo:'txt'},{t:'Tipo',tipo:'txt'},{t:'Descrição',tipo:'txt'},{t:'Oficina',tipo:'txt'},{t:'Motorista',tipo:'txt'},{t:'Valor',tipo:'brl'}];
+    const gs=gastos.filter(g=>naFaixa(g.data,de,ate)&&(!fPl||normPlaca(g.placa)===normPlaca(fPl))).sort((a,b)=>a.data.localeCompare(b.data));
+    return {titulo:T.nome, sub, cols, linhas:gs.map(g=>[br(g.data), g.placa?fmtPlaca(g.placa):'Sem caminhão', g.tipo||'', g.desc||'', g.oficina||'', g.motoristaId?mot(g.motoristaId).nome:'', num(g.valor)]), total:['Total','','','','','',r2(soma(gs,g=>g.valor))]};
+  }
+  if(REL.tipo==='manutPlaca'){
+    const gs=gastos.filter(g=>naFaixa(g.data,de,ate)&&(!fPl||normPlaca(g.placa)===normPlaca(fPl)));
+    const tipos=[...new Set([...TIPOS_GASTO.filter(t=>gs.some(g=>g.tipo===t)), ...gs.map(g=>g.tipo).filter(t=>t&&!TIPOS_GASTO.includes(t))])];
+    const cols=[{t:'Caminhão',tipo:'txt'}, ...tipos.map(t=>({t, tipo:'brl'})), {t:'Total',tipo:'brl'}];
+    const placas=[...new Set(gs.map(g=>g.placa?fmtPlaca(g.placa):''))].sort();
+    const linhas=placas.map(p=>{ const d=gs.filter(g=>(g.placa?fmtPlaca(g.placa):'')===p); return [p||'Sem caminhão', ...tipos.map(t=>r2(soma(d.filter(g=>g.tipo===t),g=>g.valor))), r2(soma(d,g=>g.valor))]; });
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?somaColunas(linhas,cols):null};
+  }
+  if(REL.tipo==='viagens'){
+    const cols=[{t:'Motorista',tipo:'txt'},{t:'Caminhão',tipo:'txt'},{t:'Viagens',tipo:'int'},{t:'Km',tipo:'int'},{t:'Carga',tipo:'txt'},{t:'Extras',tipo:'int'},{t:'Valor extras',tipo:'brl'}];
+    const vs=viagens.filter(v=>naFaixa(v.data,de,ate)&&(!fMot||v.motoristaId===fMot)&&(!fPl||normPlaca(v.placa)===normPlaca(fPl)));
+    const g={}; vs.forEach(v=>{ const k=v.motoristaId+'|'+fmtPlaca(v.placa); (g[k]=g[k]||[]).push(v); });
+    const linhas=Object.entries(g).map(([k,a])=>[mot(a[0].motoristaId).nome, fmtPlaca(a[0].placa), a.length, soma(a,v=>v.km), cargaResumo(a), a.filter(v=>v.extra).length, r2(soma(a.filter(v=>v.extra),v=>v.valorExtra))]).sort((x,y)=>x[0].localeCompare(y[0])||x[1].localeCompare(y[1]));
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?['Total','',vs.length,soma(vs,v=>v.km),cargaResumo(vs),vs.filter(v=>v.extra).length,r2(soma(vs.filter(v=>v.extra),v=>v.valorExtra))]:null};
+  }
+  if(REL.tipo==='caixa'){
+    const cols=[{t:'Mês',tipo:'txt'},{t:'Começou com',tipo:'brl'},{t:'Entradas',tipo:'brl'},{t:'Saídas',tipo:'brl'},{t:'Resultado do mês',tipo:'brl'},{t:'Terminou com',tipo:'brl'}];
+    const linhas=mesesEntre(de,ate).map(m=>{ const c=caixaMes(m); return [mesNomeCap(m), c.inicio, c.ent, c.sai, r2(c.ent-c.sai), c.fim]; }).filter(l=>l[1]||l[2]||l[3]);
+    return {titulo:T.nome, sub, cols, linhas, total:linhas.length>1?['Total','',r2(soma(linhas,l=>l[2])),r2(soma(linhas,l=>l[3])),r2(soma(linhas,l=>l[4])),'']:null};
+  }
+  return {titulo:'', sub:'', cols:[], linhas:[]};
+}
+function relNomeArquivo(ext){ const r=REL.dados; return (tiraAc(r.titulo).toLowerCase().replace(/[^a-z0-9]+/g,'_')+'_'+REL.de+(REL.ate!==REL.de?'_a_'+REL.ate:'')).replace(/_+/g,'_')+'.'+ext; }
+const tiraAc = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
+function relPlanilha(){
+  const r=REL.dados; if(!r) return;
+  const fmt=(v,c)=>c.tipo==='txt'?'"'+String(v??'').replace(/"/g,'""')+'"':(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:c.tipo==='brl'?2:0,maximumFractionDigits:2,useGrouping:false});
+  const linhas=[[r.titulo],[r.sub],[], r.cols.map(c=>c.t), ...r.linhas.map(l=>l.map((v,i)=>fmt(v,r.cols[i]))), ...(r.total?[r.total.map((v,i)=>v===''||v===null?'':fmt(v,r.cols[i]))]:[])];
+  const csv='﻿'+linhas.map(l=>l.map(x=>typeof x==='string'&&!x.startsWith('"')&&/[;"\n]/.test(x)?'"'+x+'"':x).join(';')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download=relNomeArquivo('csv'); a.click(); toast('Planilha baixada');
+}
+function relPDF(){
+  const r=REL.dados; if(!r) return;
+  if(!window.jspdf){ toast('O gerador de PDF ainda não carregou. Tente de novo em instantes.',true); return; }
+  const paisagem=r.cols.length>5, {jsPDF}=window.jspdf, doc=new jsPDF({unit:'mm',format:'a4',orientation:paisagem?'landscape':'portrait'});
+  const PW=paisagem?297:210, PH=paisagem?210:297, ML=12, MR=PW-12, W=MR-ML;
+  const pesos=r.cols.map(c=>c.tipo==='txt'?(c.t==='Descrição'||c.t==='Observação'?2.2:1.4):1);
+  const larg=pesos.map(p=>p/pesos.reduce((a,b)=>a+b,0)*W);
+  const xs=[]; larg.reduce((x,w,i)=>(xs[i]=x, x+w), ML);
+  const txt=(v,c)=>c.tipo==='brl'?realTxt(v):c.tipo==='int'?inteiro(v):c.tipo==='num'?dec(v):tiraAc(v??'');
+  const realTxt=v=>'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  let y;
+  const topo=()=>{ doc.setFillColor(23,36,47); doc.rect(0,0,PW,20,'F'); doc.setTextColor(255,255,255); doc.setFont('times','bold'); doc.setFontSize(15); doc.text('Rodo W',ML,12.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(tiraAc(r.titulo),MR,10,{align:'right'}); doc.setFontSize(8); doc.text(tiraAc(r.sub),MR,15,{align:'right'}); y=30; cab(); };
+  const corta=(s,w)=>{ s=String(s); while(s.length>1&&doc.getTextWidth(s)>w-2) s=s.slice(0,-2)+'…'; return s; };
+  const cab=()=>{ doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,110,120);
+    r.cols.forEach((c,i)=>{ const t=corta(tiraAc(c.t).toUpperCase(),larg[i]); c.tipo==='txt'?doc.text(t,xs[i]+1,y):doc.text(t,xs[i]+larg[i]-1,y,{align:'right'}); });
+    doc.setDrawColor(207,215,221); doc.setLineWidth(0.3); doc.line(ML,y+2,MR,y+2); y+=7; };
+  const linha=(l,negrito)=>{ if(y>PH-14){ doc.addPage(); topo(); }
+    doc.setFont('helvetica',negrito?'bold':'normal'); doc.setFontSize(8.5); doc.setTextColor(30,40,50);
+    l.forEach((v,i)=>{ if(v===''||v===null) return; const c=r.cols[i], t=corta(txt(v,c),larg[i]); c.tipo==='txt'?doc.text(t,xs[i]+1,y):doc.text(t,xs[i]+larg[i]-1,y,{align:'right'}); });
+    doc.setDrawColor(226,231,235); doc.setLineWidth(0.15); doc.line(ML,y+2,MR,y+2); y+=6; };
+  topo(); r.linhas.forEach(l=>linha(l)); if(r.total){ y+=1; linha(r.total,true); }
+  if(r.nota){ if(y>PH-20){ doc.addPage(); topo(); } doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(110,120,130); doc.text(doc.splitTextToSize?doc.splitTextToSize(tiraAc(r.nota),W):[tiraAc(r.nota)],ML,y+4); }
+  const n=doc.getNumberOfPages?doc.getNumberOfPages():1;
+  for(let i=1;i<=n;i++){ if(doc.setPage) doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(130,140,150); doc.text(`Emitido em ${br(hoje())} · página ${i} de ${n}`,PW/2,PH-6,{align:'center'}); }
+  doc.save(relNomeArquivo('pdf')); toast('PDF baixado');
 }
 
 R.manutencao = () => {
